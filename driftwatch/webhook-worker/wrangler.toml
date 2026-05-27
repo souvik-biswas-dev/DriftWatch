@@ -1,0 +1,16 @@
+name = "driftwatch-webhook"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Non-secret variables. Override per-environment with [env.production.vars], etc.
+# Secrets (GITHUB_WEBHOOK_SECRET, DRIFTWATCH_SECRET) MUST be set via
+#   wrangler secret put <NAME>
+# and are NEVER committed here.
+[vars]
+BACKEND_URL = "http://localhost:8080"
+
+# Example production override — copy-paste and customize:
+# [env.production]
+# name = "driftwatch-webhook-prod"
+# [env.production.vars]
+# BACKEND_URL = "https://api.driftwatch.example.com"
