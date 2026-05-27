@@ -1,0 +1,46 @@
+# Render.com deployment manifest for the DriftWatch backend.
+#
+# Usage:
+#   1. Push this repo to GitHub.
+#   2. In Render, create a new "Blueprint" pointing at this file.
+#   3. Render will provision the service. Set the `sync: false` secrets in
+#      the Render dashboard before the first deploy.
+
+services:
+  - type: web
+    name: driftwatch-backend
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: true
+
+    envVars:
+      - key: PORT
+        value: "8080"
+
+      # Connection strings — set these in the Render dashboard, not here.
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+      # Third-party API keys.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+
+      # Server-side secrets — let Render generate strong random values.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: WEBHOOK_SECRET
+        generateValue: true
+
+      # Comma-separated list of origins allowed by CORS.
+      - key: ALLOWED_ORIGIN
+        value: "https://driftwatch-dashboard.example.com"
