@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+	--accent: #00ff88;
+	--accent-dim: rgba(0, 255, 136, 0.15);
+	--bg: #0a0a0a;
+	--bg-elevated: #131313;
+	--bg-card: #141414;
+	--border: #1f1f1f;
+	--border-hover: #2a2a2a;
+	--text-muted: #737373;
+}
+
+html,
+body {
+	background: var(--bg);
+	color: #e5e5e5;
+	font-family: 'Inter', system-ui, -apple-system, sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+
+.font-mono {
+	font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* Severity badge pulse for critical drift */
+@keyframes pulse-critical {
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+	}
+	50% {
+		box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+	}
+}
+.pulse-critical {
+	animation: pulse-critical 1.6s infinite;
+}
+
+/* Skeleton-loading shimmer */
+@keyframes shimmer {
+	0% {
+		background-position: -200% 0;
+	}
+	100% {
+		background-position: 200% 0;
+	}
+}
+.skeleton-shimmer {
+	background: linear-gradient(90deg, #141414 0%, #1f1f1f 50%, #141414 100%);
+	background-size: 200% 100%;
+	animation: shimmer 1.8s infinite linear;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+::-webkit-scrollbar-track {
+	background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--border-hover);
+}
+
+/* Bits-UI dialog overlay/content base styles */
+[data-dialog-overlay] {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.7);
+	backdrop-filter: blur(4px);
+	z-index: 40;
+}
+[data-dialog-content] {
+	position: fixed;
+	z-index: 50;
+}
+
+/* D3 axes */
+.axis text {
+	fill: #737373;
+	font-family: 'JetBrains Mono', monospace;
+	font-size: 11px;
+}
+.axis path,
+.axis line {
+	stroke: #2a2a2a;
+}
