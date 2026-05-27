@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS drift_events;
+DROP TABLE IF EXISTS snapshots;
+DROP TABLE IF EXISTS projects;
