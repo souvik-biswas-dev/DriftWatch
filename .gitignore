@@ -1,6 +1,9 @@
 cv.md
 .env
 
+# Local demo project (not part of the public repo)
+demo-project/
+
 # Local-only setup notes (kept out of the public repo)
 SETUP.md
 
