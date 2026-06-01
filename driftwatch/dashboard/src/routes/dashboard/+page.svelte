@@ -16,32 +16,70 @@
 		name: '',
 		repo_owner: '',
 		repo_name: '',
-		repo_branch: 'main',
-		docker_host: ''
+		repo_branch: 'main'
 	};
+
+	// After a project is created the backend returns a one-time agent key.
+	// We reveal it in a dedicated dialog with the exact `docker run` command,
+	// because it is never retrievable again.
+	let keyDialogOpen = false;
+	let newAgentKey = '';
+	let newProjectName = '';
+
+	const apiBase =
+		(typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) ||
+		'http://localhost:8080';
+
+	$: agentRunCommand =
+		`docker run -d --name driftwatch-agent --restart unless-stopped \\\n` +
+		`  -v /var/run/docker.sock:/var/run/docker.sock:ro \\\n` +
+		`  -e DRIFTWATCH_URL="${apiBase}" \\\n` +
+		`  -e DRIFTWATCH_AGENT_KEY="${newAgentKey}" \\\n` +
+		`  driftwatch-agent`;
 
 	function resetForm() {
 		form = {
 			name: '',
 			repo_owner: '',
 			repo_name: '',
-			repo_branch: 'main',
-			docker_host: ''
+			repo_branch: 'main'
 		};
 	}
 
+	async function copyKey() {
+		try {
+			await navigator.clipboard.writeText(newAgentKey);
+			toast.success('Agent key copied');
+		} catch {
+			toast.error('Copy failed — select and copy manually');
+		}
+	}
+
+	async function copyCommand() {
+		try {
+			await navigator.clipboard.writeText(agentRunCommand);
+			toast.success('Command copied');
+		} catch {
+			toast.error('Copy failed — select and copy manually');
+		}
+	}
+
 	async function handleCreate() {
-		if (!form.name || !form.repo_owner || !form.repo_name || !form.docker_host) {
+		if (!form.name || !form.repo_owner || !form.repo_name) {
 			toast.error('Please fill in all required fields');
 			return;
 		}
 		submitting = true;
 		try {
-			const project = await api.createProject(form);
+			const { project, agent_key } = await api.createProject(form);
 			projects.add(project);
 			toast.success(`Project "${project.name}" created`);
 			dialogOpen = false;
 			resetForm();
+			// Surface the one-time agent key.
+			newAgentKey = agent_key;
+			newProjectName = project.name;
+			keyDialogOpen = true;
 		} catch (e) {
 			const msg = e instanceof ApiClientError ? e.message : 'Failed to create project';
 			toast.error(msg);
@@ -170,7 +208,7 @@
 						</div>
 
 						<div class="mt-4 flex items-center justify-between border-t border-neutral-900 pt-3 text-xs text-neutral-500">
-							<span class="truncate font-mono">{project.docker_host}</span>
+							<span class="truncate font-mono">agent push</span>
 							<span class="shrink-0 pl-3">{timeAgo(project.updated_at)}</span>
 						</div>
 					</button>
@@ -193,7 +231,8 @@
 				<div>
 					<Dialog.Title class="font-mono text-lg font-bold text-white">New Project</Dialog.Title>
 					<Dialog.Description class="mt-0.5 text-xs text-neutral-500">
-						Configure a Docker host to monitor for drift.
+						Point at the GitHub repo holding your docker-compose.yml. You'll get an
+						agent key to run on your server.
 					</Dialog.Description>
 				</div>
 				<Dialog.Close class="rounded-md p-1 text-neutral-500 transition-colors hover:bg-neutral-900 hover:text-white">
@@ -256,20 +295,11 @@
 						/>
 					</div>
 
-					<div>
-						<label for="np-host" class="mb-1.5 block font-mono text-xs uppercase tracking-widest text-neutral-400">
-							Docker Host URL
-						</label>
-						<input
-							id="np-host"
-							type="text"
-							bind:value={form.docker_host}
-							placeholder="tcp://docker.internal:2375"
-							required
-							class="w-full rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-white placeholder-neutral-600 focus:border-[#00ff88] focus:outline-none focus:ring-1 focus:ring-[#00ff88]/50"
-						/>
-						<p class="mt-1.5 font-mono text-xs text-neutral-600">
-							TCP socket or unix:// path. Must be reachable from the DriftWatch backend.
+					<div class="rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-3">
+						<p class="font-mono text-xs leading-relaxed text-neutral-500">
+							<span class="text-neutral-300">No Docker host needed.</span> After creating
+							the project you'll get a one-time agent key. Run the DriftWatch agent on the
+							server where your containers live and it pushes state here automatically.
 						</p>
 					</div>
 				</div>
@@ -288,6 +318,79 @@
 					</button>
 				</div>
 			</form>
+		</Dialog.Content>
+	</Dialog.Portal>
+</Dialog.Root>
+
+<!-- One-time agent key reveal -->
+<Dialog.Root bind:open={keyDialogOpen}>
+	<Dialog.Portal>
+		<Dialog.Overlay transition={fade} transitionConfig={{ duration: 150 }} />
+		<Dialog.Content
+			transition={fly}
+			transitionConfig={{ y: 24, duration: 240 }}
+			class="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-[#0f0f0f] shadow-2xl"
+		>
+			<div class="border-b border-neutral-900 px-6 py-4">
+				<Dialog.Title class="font-mono text-lg font-bold text-white">
+					Agent key for "{newProjectName}"
+				</Dialog.Title>
+				<Dialog.Description class="mt-1 text-xs text-yellow-500/90">
+					⚠ Shown only once. Copy it now — you can't retrieve it later.
+				</Dialog.Description>
+			</div>
+
+			<div class="space-y-5 overflow-y-auto px-6 py-6">
+				<div>
+					<div class="mb-1.5 font-mono text-xs uppercase tracking-widest text-neutral-400">
+						Agent key
+					</div>
+					<div class="flex items-stretch gap-2">
+						<code
+							class="flex-1 break-all rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-xs text-[#00ff88]"
+						>{newAgentKey}</code>
+						<button
+							type="button"
+							on:click={copyKey}
+							class="shrink-0 rounded-md border border-neutral-800 px-3 font-mono text-xs text-neutral-300 transition-colors hover:bg-neutral-900"
+						>
+							Copy
+						</button>
+					</div>
+				</div>
+
+				<div>
+					<div class="mb-1.5 font-mono text-xs uppercase tracking-widest text-neutral-400">
+						Run the agent on your server
+					</div>
+					<pre
+						class="overflow-x-auto rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-3 font-mono text-xs leading-relaxed text-neutral-300"
+					>{agentRunCommand}</pre>
+					<button
+						type="button"
+						on:click={copyCommand}
+						class="mt-2 rounded-md border border-neutral-800 px-3 py-1.5 font-mono text-xs text-neutral-300 transition-colors hover:bg-neutral-900"
+					>
+						Copy command
+					</button>
+					<p class="mt-2 font-mono text-xs text-neutral-600">
+						Build the image once with
+						<code class="text-neutral-400">docker build -f cmd/agent/Dockerfile -t driftwatch-agent .</code>
+						from the backend folder. The agent reads local Docker and pushes state here.
+					</p>
+				</div>
+			</div>
+
+			<div class="mt-auto flex items-center justify-end border-t border-neutral-900 px-6 py-4">
+				<button
+					type="button"
+					on:click={() => (keyDialogOpen = false)}
+					class="rounded-md px-4 py-2 font-mono text-sm font-semibold transition-all hover:scale-105"
+					style="background: var(--accent); color: #0a0a0a;"
+				>
+					I've saved it
+				</button>
+			</div>
 		</Dialog.Content>
 	</Dialog.Portal>
 </Dialog.Root>
