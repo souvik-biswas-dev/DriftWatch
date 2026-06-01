@@ -206,7 +206,33 @@ func run() error {
 		close(serverErr)
 	}()
 
-	// 9. Graceful shutdown.
+	// 9. Self-ping to prevent Render free-tier sleep (spins down after 15 min
+	// of inactivity). Requires BACKEND_URL env var; silently skipped if unset.
+	if backendURL := os.Getenv("BACKEND_URL"); backendURL != "" {
+		pingURL := strings.TrimRight(backendURL, "/") + "/health"
+		go func() {
+			ticker := time.NewTicker(10 * time.Minute)
+			defer ticker.Stop()
+			client := &http.Client{Timeout: 10 * time.Second}
+			for {
+				select {
+				case <-rootCtx.Done():
+					return
+				case <-ticker.C:
+					resp, err := client.Get(pingURL)
+					if err != nil {
+						slog.Warn("keep-alive ping failed", "error", err)
+					} else {
+						resp.Body.Close()
+					}
+				}
+			}
+		}()
+		slog.Info("keep-alive self-ping enabled", "url", pingURL, "interval", "10m")
+	}
+
+	// 10. Graceful shutdown.
+
 	select {
 	case err := <-serverErr:
 		return fmt.Errorf("http listen: %w", err)
