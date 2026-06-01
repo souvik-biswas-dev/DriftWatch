@@ -135,9 +135,48 @@ func run() error {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(corsMiddleware(allowedOrigin))
+
+	// Root route — a lightweight 200 so uptime monitors (UptimeRobot) and a
+	// human hitting the base URL get a friendly response instead of a 404.
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"service": "driftwatch-backend",
+			"status":  "ok",
+			"docs":    "https://github.com/souvik-biswas-dev/driftwatch",
+		})
+	})
+
+	// Liveness — process is up. Cheap; safe to hit frequently.
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Readiness — also verifies Postgres + Redis are reachable. Returns 503 if
+	// a dependency is down so a monitor can distinguish "process up" from
+	// "fully healthy". Each check has a short timeout to stay snappy.
+	r.GET("/status", func(c *gin.Context) {
+		out := gin.H{"status": "ok", "postgres": "ok", "redis": "ok"}
+		code := http.StatusOK
+
+		pgCtx, pgCancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		if err := pool.Ping(pgCtx); err != nil {
+			out["postgres"] = "down"
+			out["status"] = "degraded"
+			code = http.StatusServiceUnavailable
+		}
+		pgCancel()
+
+		rCtx, rCancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		if err := rdb.Ping(rCtx).Err(); err != nil {
+			out["redis"] = "down"
+			out["status"] = "degraded"
+			code = http.StatusServiceUnavailable
+		}
+		rCancel()
+
+		c.JSON(code, out)
+	})
+
 	apiSrv.RegisterRoutes(r)
 
 	server := &http.Server{
