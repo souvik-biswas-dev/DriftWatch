@@ -49,8 +49,12 @@ type Snapshot struct {
 }
 
 type User struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        string             `json:"email"`
-	PasswordHash string             `json:"password_hash"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ID                   uuid.UUID          `json:"id"`
+	Email                string             `json:"email"`
+	PasswordHash         *string            `json:"password_hash"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	GithubID             *int64             `json:"github_id"`
+	GithubLogin          string             `json:"github_login"`
+	AvatarUrl            string             `json:"avatar_url"`
+	GithubTokenEncrypted string             `json:"github_token_encrypted"`
 }
