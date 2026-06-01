@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/YOURUSERNAME/driftwatch/internal/db"
+	"github.com/YOURUSERNAME/driftwatch/internal/docker"
 )
 
 // SchedulerAPI is the subset of the scheduler that the HTTP layer drives.
@@ -15,6 +16,7 @@ type SchedulerAPI interface {
 	RegisterProject(p db.Project)
 	UnregisterProject(projectID uuid.UUID)
 	TriggerScan(projectID uuid.UUID) error
+	IngestLiveState(projectID uuid.UUID, live *docker.LiveSnapshot)
 }
 
 type API struct {
@@ -39,6 +41,9 @@ func (a *API) RegisterRoutes(r *gin.Engine) {
 
 	// Internal webhook — verified by shared-secret header, not JWT.
 	r.POST("/api/webhook/github", a.handleGitHubWebhook)
+
+	// Agent ingest — authenticated by the per-project agent key header, not JWT.
+	r.POST("/api/agent/state", a.handleAgentState)
 
 	protected := r.Group("/api")
 	protected.Use(a.authMiddleware())
