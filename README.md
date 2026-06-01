@@ -1,18 +1,81 @@
+<div align="center">
+
 # DriftWatch
 
-Autonomous infrastructure drift detection — continuously diffs live Docker state against GitHub-declared `docker-compose.yml`, classifies divergence with Gemini AI, and fires Discord alerts within 60 seconds of any change.
+**A watchdog that tells you the moment your live servers stop matching your git-declared `docker-compose.yml`.**
 
-**Stack:** Go · SvelteKit · Cloudflare Workers · Neon Postgres · Upstash Redis · Gemini 1.5 Flash
+Continuously compares the **real** state of your Docker containers against the
+**declared** state in your GitHub repo, flags any divergence ("drift") within
+~60 seconds, and optionally explains the fix with AI and alerts you on Discord.
 
-> **Want to run or share it?** See **[SETUP.md](SETUP.md)** — a step-by-step,
-> 100% free-tier guide: what to create, where to get each value, how to host the
-> backend for free, and how anyone runs the agent on their own server.
+[![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-FF3E00?logo=svelte&logoColor=white)](https://kit.svelte.dev)
+[![Cloudflare](https://img.shields.io/badge/Cloudflare-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
+[![Postgres](https://img.shields.io/badge/Postgres-4169E1?logo=postgresql&logoColor=white)](https://neon.tech)
+[![Redis](https://img.shields.io/badge/Redis-FF4438?logo=redis&logoColor=white)](https://upstash.com)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
 
-DriftWatch is a **multi-user tool**, not a single-project script. You host the
-backend once; then anyone can sign up, create a project, and run a small **agent**
-on their own server. The agent reads their local Docker and pushes the state to
-the backend over HTTPS — the backend never connects into a user's Docker host, so
-it's safe to share and works behind NAT/firewalls.
+**[Live demo →](https://driftwatch.pages.dev)**  ·  Architected & engineered by **[Souvik Biswas](https://souvikbiswas-portfolio.pages.dev)** · [GitHub](https://github.com/souvik-biswas-dev)
+
+</div>
+
+---
+
+## What problem does it solve?
+
+When you deploy with Docker, your `docker-compose.yml` in git is the **plan** —
+"run nginx 1.25, this database, these env vars." Over time the **reality** on the
+server drifts away from that plan: someone SSHes in and tweaks a value, a container
+restarts on a stale image, a half-failed deploy leaves things inconsistent. Nobody
+notices until something breaks.
+
+**DriftWatch is the tripwire.** It catches five kinds of drift and surfaces them
+in a dashboard (with optional AI-written fix suggestions and Discord alerts):
+
+| Drift type | Meaning | Severity |
+|---|---|---|
+| `missing_container` | Declared in compose but not running | critical |
+| `extra_container` | Running but not in compose | warning |
+| `image_stale` | Running image tag ≠ declared tag | warning |
+| `env_mismatch` | One or more env vars differ | warning |
+| `port_changed` | Host port binding differs | info |
+
+---
+
+## How it works (multi-user, agent-push)
+
+DriftWatch is a **multi-user SaaS**, not a single-project script. You host the
+backend **once**; then anyone signs up, points a project at their GitHub repo, and
+runs a tiny **agent** on the server they want monitored.
+
+```
+  USER'S OWN SERVER                          YOUR HOSTED BACKEND
+ ┌───────────────────┐                      ┌──────────────────────┐
+ │  Docker daemon     │                      │   declared state ◄───┼── GitHub
+ │       ▲            │   pushes live state  │   (docker-compose)   │   repo
+ │       │ reads      │  ──── HTTPS ───────► │                      │
+ │  [DriftWatch agent]│   (per-project key)  │   diff → drift       │
+ └───────────────────┘                      │   ├─ dashboard (UI)   │
+                                            │   ├─ Discord alert    │
+                                            │   └─ optional AI      │
+                                            └──────────────────────┘
+```
+
+The key design choice: **the backend never connects into a user's Docker host.**
+The agent reads local Docker and pushes state *out*, so it's safe to share with
+strangers and works behind NAT/firewalls — the same model Datadog and Netdata use.
+
+> **Want to run or deploy it?** See **[SETUP.md](SETUP.md)** — a step-by-step,
+> 100% free-tier guide (Render + Cloudflare + Neon + Upstash): what to create,
+> where to get each value, and how a user runs the agent.
+
+**Per-user, not operator-wide:** GitHub tokens (for private repos) and Discord
+webhooks are entered **per project** by each user — a user's private repo is read
+with their own token (encrypted at rest with AES-256-GCM), and their alerts go to
+their own channel. **AI is optional and off by default** — drift detection works
+fully without it; add a Gemini key to enable AI summaries.
+
+**Stack:** Go (Gin) · SvelteKit · Cloudflare Workers + Pages · Neon Postgres · Upstash Redis · Docker · optional Gemini 2.5 Flash
 
 ---
 
@@ -32,75 +95,86 @@ it's safe to share and works behind NAT/firewalls.
 ### System Overview
 
 ```
+  USER'S SERVER                              GitHub Repo (docker-compose.yml)
+ ┌──────────────────┐                          │              │
+ │  Docker daemon    │                          │ push event   │ Contents API
+ │       ▲ reads     │                          ▼              │ (declared)
+ │  [DriftWatch      │                  ┌─────────────────┐    │
+ │   agent]          │                  │ Cloudflare      │    │
+ └───────┬──────────┘                  │ Worker (HMAC)   │    │
+         │ POST live state              └────────┬────────┘    │
+         │ /api/agent/state  (agent key)         │ forward     │
+         ▼                                       ▼             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  GitHub Repo                                                        │
-│  (docker-compose.yml)                                               │
-└──────────────┬───────────────────────────┬──────────────────────────┘
-               │ push event                │ REST (fetch file)
-               ▼                           ▼
-┌──────────────────────┐       ┌───────────────────────┐
-│  Cloudflare Worker   │       │   GitHub Client (Go)  │
-│  (HMAC-SHA256 verify)│──────▶│   Fetch compose YAML  │
-└──────────────────────┘       └──────────┬────────────┘
-         webhook forward                  │ declared state
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Go Backend (Gin)                             │
+│                          Go Backend (Gin)                           │
 │                                                                     │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌────────────────┐  │
-│  │  Cron Scheduler │───▶│  Drift Engine   │───▶│  Gemini Agent  │  │
-│  │  (@every 60s)   │    │  (Diff + Hash)  │    │  (AI analysis) │  │
-│  └─────────────────┘    └────────┬────────┘    └───────┬────────┘  │
-│           │                      │                      │           │
-│           │              ┌───────┴───────┐              │           │
-│           │              │  Docker Engine│              │           │
-│           │              │  API (live)   │              │           │
-│           │              └───────────────┘              │           │
-│           │                                             │           │
-│  ┌────────▼─────────────────────────────────────────── ▼────────┐  │
-│  │                    Postgres (Neon)                            │  │
-│  │   users · projects · snapshots · drift_events                │  │
+│  ┌──────────────────┐   ┌─────────────────┐   ┌────────────────┐   │
+│  │  Ingest + Scan    │──▶│  Drift Engine   │──▶│  Gemini AI     │   │
+│  │  (agent-pushed)   │   │  (Diff + Hash)  │   │  (OPTIONAL)    │   │
+│  └──────────────────┘   └────────┬────────┘   └───────┬────────┘   │
+│           │                      │                     │            │
+│  ┌────────▼──────────────────────▼─────────────────────▼────────┐  │
+│  │                       Postgres (Neon)                         │  │
+│  │   users · projects · snapshots · drift_events                 │  │
 │  └───────────────────────────────────────────────────────────────┘  │
-│                                          │                          │
-│  ┌────────────────────┐        ┌─────────▼──────────┐              │
+│  ┌────────────────────┐        ┌────────────────────┐              │
 │  │  Upstash Redis     │        │  Discord Alerts     │              │
-│  │  (SHA256 dedup)    │        │  (webhook notify)   │              │
+│  │  (live cache +     │        │  (per-project       │              │
+│  │   SHA256 dedup)    │        │   webhook, opt.)    │              │
 │  └────────────────────┘        └────────────────────┘              │
 └─────────────────────────────────────────────────────────────────────┘
-               ▲
-               │ REST / JWT
+               ▲ REST / JWT
 ┌──────────────┴──────────────┐
-│   SvelteKit Dashboard       │
+│   SvelteKit Dashboard       │   (Cloudflare Pages)
 │   (projects, drifts, auth)  │
 └─────────────────────────────┘
 ```
 
 ### Data Flow
 
-1. **Webhook path** — GitHub fires a push event → Cloudflare Worker verifies HMAC-SHA256 signature → forwards to backend `/api/webhook/github` with a shared-secret header → backend triggers an immediate out-of-schedule scan for the affected project.
+1. **Agent push** — the agent on a user's server reads local Docker and `POST`s the
+   live snapshot to `/api/agent/state`, authenticated by a per-project agent key
+   (only the key's SHA-256 hash is stored). The backend caches the snapshot in
+   Redis and runs a scan immediately.
 
-2. **Scheduled path** — Cron scheduler fires every 60 seconds per registered project → Docker Engine API fetches live container state → GitHub client fetches declared `docker-compose.yml` → Diff engine compares both snapshots.
+2. **Declared state** — the backend fetches the project's `docker-compose.yml` from
+   GitHub. Private repos are read with the user's **own** token (decrypted per scan);
+   public repos need no token.
 
-3. **Dedup** — SHA256 hash of the combined live + declared state is stored in Upstash Redis. If the hash matches the previous run, the scan exits early — no DB write, no Gemini call.
+3. **Dedup** — a SHA-256 hash of the live state is stored in Upstash Redis. If it
+   matches the previous run, the scan exits early — no DB write, no AI call.
 
-4. **AI analysis** — On a new state hash, drift events are serialized and sent to Gemini 1.5 Flash with a strict JSON schema. The response includes severity, fix command, explanation, and per-container breakdown.
+4. **Diff** — the drift engine deterministically compares live vs declared and
+   produces typed `DriftEvent` structs (the five drift types above).
 
-5. **Persistence** — Snapshot + drift events are written to Postgres via sqlc-generated type-safe queries. Discord alert is fired if the drift is unresolved.
+5. **AI analysis (optional)** — if a Gemini key is configured, drift events are sent
+   to Gemini 2.5 Flash with a strict JSON schema returning severity, a one-line fix
+   command, an explanation, and a per-container breakdown. With no key, rule-based
+   severity is used and the scan still records the drift.
 
-6. **Dashboard** — SvelteKit SPA reads drift history and project status via JWT-authenticated REST endpoints.
+6. **Persistence + alert** — snapshot and drift events are written to Postgres via
+   sqlc-generated queries. If the project has a Discord webhook configured, an alert
+   is fired (empty webhook = no-op, no error).
+
+7. **Webhook path (optional)** — on a `git push`, a Cloudflare Worker verifies the
+   GitHub HMAC-SHA256 signature and forwards to `/api/webhook/github`, triggering an
+   immediate re-scan against the last agent-pushed state.
+
+8. **Dashboard** — the SvelteKit SPA reads drift history and project status via
+   JWT-authenticated REST endpoints.
 
 ### Component Responsibilities
 
 | Component | Responsibility |
 |---|---|
-| Cloudflare Worker | GitHub webhook ingestion; HMAC verification; fast acknowledgement via `ctx.waitUntil` |
-| Cron Scheduler | Per-project goroutine-safe job registry; 60-second polling cadence |
+| DriftWatch Agent | Runs on the user's host; reads local Docker (read-only) and pushes state to the backend over HTTPS |
+| Ingest + Scheduler | Receives agent pushes, caches live state in Redis, orchestrates the scan |
 | Drift Engine | Deterministic diff of live vs declared state; produces typed `DriftEvent` structs |
-| Gemini Agent | LLM-based severity classification and fix suggestion; strict JSON output |
-| GitHub Client | Fetches raw `docker-compose.yml` from any branch via GitHub Contents API |
-| Docker Client | Reads live container state (image, env, ports) via Docker Engine API |
-| Discord Alerts | Sends formatted embed messages on new unresolved drift |
-| Redis (Upstash) | Deduplication cache keyed by project ID + state SHA256 |
+| Gemini AI (optional) | LLM severity classification + fix suggestion; strict JSON output; off by default |
+| Cloudflare Worker | GitHub webhook ingestion; HMAC verification; fast acknowledgement via `ctx.waitUntil` |
+| GitHub Client | Fetches `docker-compose.yml` via the Contents API using each project's own token |
+| Discord Alerts | Sends formatted embed messages on new unresolved drift (per-project webhook) |
+| Redis (Upstash) | Live-state cache + deduplication keyed by project ID + state SHA256 |
 | Postgres (Neon) | Persistent store for users, projects, snapshots, drift events |
 | SvelteKit Dashboard | Auth, project management, drift event viewer |
 
@@ -118,14 +192,16 @@ users
 └── created_at    TIMESTAMPTZ
 
 projects
-├── id                    UUID PK
-├── user_id               UUID FK → users.id
-├── name                  TEXT
-├── repo_owner            TEXT
-├── repo_name             TEXT
-├── repo_branch           TEXT  DEFAULT 'main'
-├── docker_host           TEXT  (tcp://host:2375 or unix socket)
-├── github_token_encrypted TEXT (encrypted at app layer)
+├── id                     UUID PK
+├── user_id                UUID FK → users.id
+├── name                   TEXT
+├── repo_owner             TEXT
+├── repo_name              TEXT
+├── repo_branch            TEXT  DEFAULT 'main'
+├── agent_key_hash         TEXT  (SHA-256 of the per-project agent key)
+├── github_token_encrypted TEXT  (AES-256-GCM, for private repos)
+├── discord_webhook_url    TEXT  (per-project alerts; blank = none)
+├── docker_host            TEXT  (legacy, unused in the agent-push model)
 └── created_at / updated_at
 
 snapshots
@@ -173,34 +249,37 @@ Diff algorithm:
 3. For each name: detect missing/extra first, then image, env (sorted key walk), port.
 4. Each `DriftEvent` carries a UUID, detected timestamp, and both live/declared values.
 
-### Scheduler (`internal/scheduler/scheduler.go`)
+### Scheduler / ingest (`internal/scheduler/`)
+
+Scans are **driven by the agent**, not a poll loop. When the agent pushes state:
 
 ```
-Scheduler
-├── cron.Cron            robfig/cron v3 — goroutine-safe job registry
-├── entries map[UUID]EntryID  tracks per-project cron entry for deregistration
+IngestLiveState(projectID, liveSnapshot)
+├── Redis SET driftwatch:live:<id>   (cache the agent's snapshot, 24h TTL)
 └── runProjectScan(project)
-    ├── Docker Engine API → LiveSnapshot
-    ├── GitHub Contents API → docker-compose.yml → parse → LiveSnapshot
-    ├── Compute SHA256(live+declared JSON)
-    ├── Redis GET project:<id>:hash → match? → return early
+    ├── load live state from Redis cache
+    ├── Compute SHA256(live JSON)
+    ├── Redis GET driftwatch:hash:<id> → match? → return early (dedup)
+    ├── decrypt project's GitHub token (if any) → fetch docker-compose.yml
     ├── agent.Diff(live, declared) → []DriftEvent
-    ├── gemini.Analyze(events) → AnalysisResult  (if events > 0)
-    ├── db.CreateSnapshot + db.CreateDriftEvents  (transaction)
-    ├── Redis SET project:<id>:hash
-    └── alerts.Send(events, analysis)  (if unresolved)
+    ├── gemini.Analyze(events) → AnalysisResult   (only if a Gemini key is set)
+    ├── db.CreateSnapshot + db.CreateDriftEvent rows
+    ├── Redis SET driftwatch:hash:<id>
+    └── alerts.SendDriftAlertTo(project.discord_webhook_url, …)  (no-op if empty)
 ```
 
-- `RegisterProject` / `UnregisterProject` are mutex-guarded to prevent race on `entries` map.
-- `Stop()` calls `cron.Stop()` and waits on the returned context — guarantees in-flight scans finish before process exits (30-second drain window).
-- `LoadAllProjects` is called at startup to re-register all existing DB projects.
+- The GitHub webhook path re-scans against the **last agent-pushed** state cached
+  in Redis, so a `git push` produces an immediate diff without polling.
+- `Stop()` drains in-flight scans before the process exits (30-second window).
 
-### Gemini Agent (`internal/gemini/agent.go`)
+### Gemini AI (`internal/gemini/agent.go`) — optional
 
-- Calls `gemini-1.5-flash:generateContent` via the v1beta REST API (no SDK dependency).
-- System prompt enforces a strict JSON schema; response is extracted from `candidates[0].content.parts[0].text`.
-- Retries once on transient HTTP errors with a 2-second delay.
-- Returns `AnalysisResult` with: `severity`, `summary`, `fixCommand`, `explanation`, `driftBreakdown[]`.
+- Off by default. Enabled only when `GEMINI_API_KEY` is set; otherwise drift
+  detection runs with rule-based severity and no AI call.
+- Calls `gemini-2.5-flash:generateContent` (free tier) via the v1beta REST API
+  (no SDK dependency). Model overridable with `GEMINI_MODEL`.
+- Strict JSON schema; returns `AnalysisResult` with `severity`, `summary`,
+  `fixCommand`, `explanation`, `driftBreakdown[]`. Retries once on transient errors.
 
 ### Cloudflare Worker (`webhook-worker/src/index.ts`)
 
@@ -227,8 +306,9 @@ GitHub never blocks on backend latency — the worker acknowledges the delivery 
 |---|---|---|---|
 | POST | `/api/auth/register` | — | Create user account |
 | POST | `/api/auth/login` | — | Returns JWT |
-| POST | `/api/webhook/github` | Shared secret header | Trigger project scan on push |
-| POST | `/api/projects` | JWT | Create project + register with scheduler |
+| POST | `/api/agent/state` | Agent-key header | Ingest live Docker state pushed by an agent |
+| POST | `/api/webhook/github` | Shared secret header | Trigger project re-scan on push |
+| POST | `/api/projects` | JWT | Create project → returns one-time `agent_key` |
 | GET | `/api/projects` | JWT | List user's projects |
 | GET | `/api/projects/:id` | JWT | Get project detail |
 | DELETE | `/api/projects/:id` | JWT | Delete + unregister from scheduler |
@@ -281,25 +361,28 @@ src/
 ```
 driftwatch/
 ├── backend/
-│   ├── cmd/server/main.go      entrypoint — wires all components
+│   ├── cmd/
+│   │   ├── server/main.go      backend entrypoint — wires all components
+│   │   └── agent/              standalone agent (runs on the user's host) + Dockerfile
 │   ├── internal/
 │   │   ├── agent/              diff engine + drift types
-│   │   ├── alerts/             Discord webhook client
-│   │   ├── api/                Gin handlers + router + JWT middleware
-│   │   ├── db/                 sqlc-generated queries
-│   │   ├── docker/             Docker Engine API client
-│   │   ├── gemini/             Gemini 1.5 Flash REST client
-│   │   ├── github/             GitHub Contents API client
-│   │   └── scheduler/          cron-based project scan orchestrator
+│   │   ├── alerts/             Discord webhook client (per-project)
+│   │   ├── api/                Gin handlers + router + JWT/agent-key auth
+│   │   ├── crypto/             AES-256-GCM encryption for secrets at rest
+│   │   ├── db/                 sqlc-generated queries + hand-written agent queries
+│   │   ├── docker/             Docker state reader (used by the agent)
+│   │   ├── gemini/             Gemini 2.5 Flash REST client (optional)
+│   │   ├── github/             GitHub Contents API client (per-project token)
+│   │   └── scheduler/          ingest + scan orchestrator
 │   ├── migrations/             golang-migrate SQL files (embedded via iofs)
 │   ├── queries/                sqlc source SQL
 │   ├── Dockerfile
 │   ├── Makefile
 │   ├── render.yaml             Render.com deploy config
 │   └── sqlc.yaml
-├── dashboard/                  SvelteKit SPA
+├── dashboard/                  SvelteKit SPA (Cloudflare Pages)
 │   └── src/
-│       ├── lib/
+│       ├── lib/                api client, Logo component, stores
 │       └── routes/
 └── webhook-worker/             Cloudflare Worker (TypeScript)
     └── src/
@@ -316,23 +399,24 @@ driftwatch/
 ```bash
 cd driftwatch/backend
 cp .env.example .env
-# fill in DATABASE_URL, REDIS_URL, JWT_SECRET, GEMINI_API_KEY, etc.
+# minimum to boot: DATABASE_URL, REDIS_URL, JWT_SECRET  (everything else optional)
 go mod tidy
-make migrate
-make dev
+make dev          # migrations also run automatically on startup
 ```
 
-Server boots on `http://localhost:8080`. Health check: `GET /health`.
+Server boots on `http://localhost:8080`. Health: `GET /health` · deep status
+(DB + Redis): `GET /status`.
 
 ### Dashboard
 
 ```bash
 cd driftwatch/dashboard
-npm install
+npm install --legacy-peer-deps    # an .npmrc sets this; CI uses it too
 npm run dev
 ```
 
-Dashboard runs on `http://localhost:5173`. Set `ALLOWED_ORIGIN` in backend `.env` to match.
+Dashboard runs on `http://localhost:5173`. Set `ALLOWED_ORIGIN` in the backend
+`.env` to match (no trailing slash).
 
 ### Webhook Worker
 
@@ -373,17 +457,22 @@ docker run -d --name driftwatch-agent --restart unless-stopped \
 
 ## Environment Variables
 
+These are **backend** (operator) variables. GitHub tokens and Discord webhooks are
+configured **per project** by each user in the dashboard — not here.
+
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | yes | Neon Postgres connection string |
-| `REDIS_URL` | yes | Upstash Redis URL (`rediss://...`) |
-| `JWT_SECRET` | yes | Secret for signing JWTs |
-| `WEBHOOK_SECRET` | yes | Shared secret with Cloudflare Worker |
-| `GEMINI_API_KEY` | no | Google AI Studio API key — **optional, AI is off by default**. Blank = no AI summaries |
-| `GITHUB_TOKEN` | no | GitHub PAT for fetching compose files — only needed for **private** repos |
-| `DISCORD_WEBHOOK_URL` | no | Discord channel webhook for alerts |
+| `REDIS_URL` | yes | Upstash Redis URL — **`rediss://`** (TLS) for Upstash |
+| `JWT_SECRET` | yes | Secret for signing login JWTs (`openssl rand -base64 48`) |
+| `ENCRYPTION_KEY` | yes* | Encrypts users' stored GitHub tokens (AES-256-GCM). Required for real multi-user; blank = tokens stored plaintext (dev only) |
+| `WEBHOOK_SECRET` | no | Shared secret with the Cloudflare Worker; needed only if you deploy it |
+| `GEMINI_API_KEY` | no | Google AI Studio key — **AI is off by default**; blank = no AI summaries |
+| `GEMINI_MODEL` | no | Gemini model (default `gemini-2.5-flash`) |
+| `GITHUB_TOKEN` | no | Operator-wide fallback token; normally blank (per-project tokens are used) |
+| `DISCORD_WEBHOOK_URL` | no | Operator-wide fallback; normally blank (per-project webhooks are used) |
 | `PORT` | no | HTTP port (default `8080`) |
-| `ALLOWED_ORIGIN` | no | CORS origin (default `http://localhost:5173`) |
+| `ALLOWED_ORIGIN` | no | CORS origin of the dashboard (e.g. `https://driftwatch.pages.dev`) |
 
 ---
 
