@@ -1,0 +1,10 @@
+DROP INDEX IF EXISTS idx_users_email;
+ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+ALTER TABLE users ALTER COLUMN email DROP DEFAULT;
+DROP INDEX IF EXISTS idx_users_github_id;
+ALTER TABLE users DROP COLUMN github_token_encrypted;
+ALTER TABLE users DROP COLUMN avatar_url;
+ALTER TABLE users DROP COLUMN github_login;
+ALTER TABLE users DROP COLUMN github_id;
+ALTER TABLE users ALTER COLUMN password_hash DROP DEFAULT;
+ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;

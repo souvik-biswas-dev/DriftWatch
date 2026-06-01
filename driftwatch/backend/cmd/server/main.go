@@ -53,6 +53,18 @@ func run() error {
 	webhookSecret := os.Getenv("WEBHOOK_SECRET")
 	allowedOrigin := getenv("ALLOWED_ORIGIN", "http://localhost:5173")
 
+	// GitHub OAuth (sign-in). DASHBOARD_URL is where users are sent back with
+	// their session token; BACKEND_URL builds the OAuth redirect_uri.
+	oauthCfg := api.OAuthConfig{
+		ClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
+		ClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
+		DashboardURL: getenv("DASHBOARD_URL", "http://localhost:5173"),
+		BackendURL:   os.Getenv("BACKEND_URL"),
+	}
+	if !oauthCfg.Enabled() {
+		slog.Warn("GitHub OAuth not configured — set GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET to enable sign-in")
+	}
+
 	// Encryption key for users' per-project GitHub tokens at rest. Optional for
 	// local dev (tokens stored plaintext) but REQUIRED for a real multi-user
 	// deploy. Warn loudly if unset so it isn't forgotten in production.
@@ -129,7 +141,7 @@ func run() error {
 	defer sched.Stop()
 
 	// 8. HTTP layer.
-	apiSrv := api.New(queries, sched, jwtSecret, webhookSecret)
+	apiSrv := api.New(queries, sched, jwtSecret, webhookSecret, oauthCfg)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()

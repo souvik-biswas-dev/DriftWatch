@@ -164,15 +164,25 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 		log.Error("redis set", "key", redisKey, "error", err)
 	}
 
-	// Decrypt the project's own GitHub token (for private repos). Empty token
-	// falls back to unauthenticated/operator access — fine for public repos.
+	// Resolve the GitHub token used to read this repo, in priority order:
+	//   1. the project's own token (if the user pasted one), else
+	//   2. the owner's GitHub OAuth token (granted at login with `repo` scope), else
+	//   3. empty → unauthenticated (fine for public repos).
 	ghToken := ""
 	if project.GithubTokenEncrypted != nil && *project.GithubTokenEncrypted != "" {
-		tok, decErr := crypto.Decrypt(*project.GithubTokenEncrypted)
-		if decErr != nil {
-			log.Error("decrypt github token", "error", decErr)
+		if tok, decErr := crypto.Decrypt(*project.GithubTokenEncrypted); decErr != nil {
+			log.Error("decrypt project github token", "error", decErr)
 		} else {
 			ghToken = tok
+		}
+	}
+	if ghToken == "" && project.UserID != nil {
+		if enc, err := s.dbQueries.GetUserGithubToken(ctx, *project.UserID); err == nil && enc != "" {
+			if tok, decErr := crypto.Decrypt(enc); decErr != nil {
+				log.Error("decrypt owner oauth token", "error", decErr)
+			} else {
+				ghToken = tok
+			}
 		}
 	}
 
