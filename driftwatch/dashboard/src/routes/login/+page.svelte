@@ -5,6 +5,7 @@
 	import { toast } from 'svelte-sonner';
 
 	import { api, setToken, ApiClientError } from '$lib/api';
+	import Logo from '$lib/Logo.svelte';
 
 	let mode: 'login' | 'register' = 'login';
 	let email = '';
@@ -56,8 +57,8 @@
 
 <div class="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-6 py-12">
 	<div class="w-full max-w-sm" in:fade={{ duration: 200 }}>
-		<a href="/" class="mb-10 block text-center font-mono text-2xl font-bold tracking-tight">
-			<span class="text-white">Drift</span><span style="color: var(--accent)">Watch</span>
+		<a href="/" class="mb-10 flex justify-center transition-opacity hover:opacity-80">
+			<Logo size={32} wordClass="text-2xl" />
 		</a>
 
 		<div class="rounded-lg border border-neutral-800 bg-[#0f0f0f] p-7">

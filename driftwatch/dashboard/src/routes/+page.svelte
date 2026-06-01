@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
+	import Logo from '$lib/Logo.svelte';
 
 	interface Particle {
 		x: number;
@@ -141,8 +142,8 @@
 
 	<!-- Top nav -->
 	<nav class="relative z-20 flex items-center justify-between px-6 py-5 md:px-12">
-		<a href="/" class="font-mono text-xl font-bold tracking-tight">
-			<span class="text-white">Drift</span><span style="color: var(--accent)">Watch</span>
+		<a href="/" class="transition-opacity hover:opacity-80">
+			<Logo size={26} wordClass="text-xl" />
 		</a>
 		<a
 			href="/dashboard"
@@ -159,6 +160,10 @@
 			<span class="font-mono text-xs uppercase tracking-widest text-[#00ff88]">
 				Autonomous Drift Detection
 			</span>
+		</div>
+
+		<div class="mb-6 flex justify-center">
+			<Logo size={72} showWord={false} />
 		</div>
 
 		<h1 class="font-mono text-6xl font-bold tracking-tight md:text-8xl">
