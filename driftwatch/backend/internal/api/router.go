@@ -40,10 +40,6 @@ func New(queries *db.Queries, scheduler SchedulerAPI, jwtSecret, webhookSecret s
 }
 
 func (a *API) RegisterRoutes(r *gin.Engine) {
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
-
 	// Legacy email/password (kept for backward compatibility; the dashboard now
 	// uses GitHub OAuth exclusively).
 	r.POST("/api/auth/register", a.handleRegister)
