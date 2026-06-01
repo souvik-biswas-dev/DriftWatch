@@ -4,7 +4,9 @@ export interface Project {
 	repo_owner: string;
 	repo_name: string;
 	repo_branch: string;
-	docker_host: string;
+	// Legacy field, kept for backward compatibility. The agent-push model no
+	// longer uses it — live state comes from the per-project agent.
+	docker_host?: string;
 	github_token_encrypted: string | null;
 	created_at: string;
 	updated_at: string;
@@ -64,8 +66,14 @@ export interface CreateProjectInput {
 	repo_owner: string;
 	repo_name: string;
 	repo_branch: string;
-	docker_host: string;
 	github_token_encrypted?: string | null;
+}
+
+// The create-project response carries a one-time agent_key alongside the
+// project. It is shown only once — the user gives it to their agent.
+export interface CreateProjectResult {
+	project: Project;
+	agent_key: string;
 }
 
 export interface ApiSuccess<T> {
