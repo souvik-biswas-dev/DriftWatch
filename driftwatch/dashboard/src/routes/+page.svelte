@@ -111,7 +111,11 @@
 	});
 
 	onDestroy(() => {
-		cancelAnimationFrame(rafId);
+		// Guard: onDestroy also runs during SSR, where cancelAnimationFrame
+		// (a browser API) is undefined.
+		if (typeof cancelAnimationFrame !== 'undefined') {
+			cancelAnimationFrame(rafId);
+		}
 	});
 </script>
 
