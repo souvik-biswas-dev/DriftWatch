@@ -150,7 +150,9 @@ func run() error {
 
 	// Root route — a lightweight 200 so uptime monitors (UptimeRobot) and a
 	// human hitting the base URL get a friendly response instead of a 404.
-	r.GET("/", func(c *gin.Context) {
+	// GET *and* HEAD: UptimeRobot's free tier probes with HEAD, and Gin does
+	// not auto-route HEAD to GET handlers, so a HEAD-only probe would 404.
+	r.Match([]string{http.MethodGet, http.MethodHead}, "/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"service": "driftwatch-backend",
 			"status":  "ok",
@@ -158,8 +160,9 @@ func run() error {
 		})
 	})
 
-	// Liveness — process is up. Cheap; safe to hit frequently.
-	r.GET("/health", func(c *gin.Context) {
+	// Liveness — process is up. Cheap; safe to hit frequently. HEAD too, for
+	// the same monitor-probe reason as the root route above.
+	r.Match([]string{http.MethodGet, http.MethodHead}, "/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
