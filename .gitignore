@@ -1,1 +1,15 @@
 cv.md
+.env
+
+# Dependencies
+node_modules/
+
+# Compiled Go binaries. Anchored paths so the cmd/agent and internal/agent
+# SOURCE directories stay tracked — only the built binaries are ignored.
+/driftwatch/backend/agent
+/driftwatch/backend/server
+
+# Build output
+dist/
+build/
+.svelte-kit/
