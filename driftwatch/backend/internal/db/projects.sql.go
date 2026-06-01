@@ -23,7 +23,7 @@ INSERT INTO projects (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id
+RETURNING id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, created_at, updated_at, user_id, agent_key_hash, discord_webhook_url
 `
 
 type CreateProjectParams struct {
@@ -55,10 +55,11 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.RepoBranch,
 		&i.DockerHost,
 		&i.GithubTokenEncrypted,
-		&i.DiscordWebhookUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UserID,
+		&i.AgentKeyHash,
+		&i.DiscordWebhookUrl,
 	)
 	return i, err
 }
@@ -82,7 +83,7 @@ func (q *Queries) DeleteProjectForUser(ctx context.Context, arg DeleteProjectFor
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
-SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id
+SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, created_at, updated_at, user_id, agent_key_hash, discord_webhook_url
 FROM projects
 WHERE id = $1
 `
@@ -100,16 +101,17 @@ func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, er
 		&i.RepoBranch,
 		&i.DockerHost,
 		&i.GithubTokenEncrypted,
-		&i.DiscordWebhookUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UserID,
+		&i.AgentKeyHash,
+		&i.DiscordWebhookUrl,
 	)
 	return i, err
 }
 
 const getProjectByIDForUser = `-- name: GetProjectByIDForUser :one
-SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id
+SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, created_at, updated_at, user_id, agent_key_hash, discord_webhook_url
 FROM projects
 WHERE id = $1 AND user_id = $2
 `
@@ -130,16 +132,17 @@ func (q *Queries) GetProjectByIDForUser(ctx context.Context, arg GetProjectByIDF
 		&i.RepoBranch,
 		&i.DockerHost,
 		&i.GithubTokenEncrypted,
-		&i.DiscordWebhookUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UserID,
+		&i.AgentKeyHash,
+		&i.DiscordWebhookUrl,
 	)
 	return i, err
 }
 
 const listProjects = `-- name: ListProjects :many
-SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id
+SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, created_at, updated_at, user_id, agent_key_hash, discord_webhook_url
 FROM projects
 ORDER BY created_at DESC
 `
@@ -166,6 +169,8 @@ func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.UserID,
+			&i.AgentKeyHash,
+			&i.DiscordWebhookUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -178,7 +183,7 @@ func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
 }
 
 const listProjectsByRepo = `-- name: ListProjectsByRepo :many
-SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id
+SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, created_at, updated_at, user_id, agent_key_hash, discord_webhook_url
 FROM projects
 WHERE repo_owner = $1 AND repo_name = $2
 `
@@ -210,6 +215,8 @@ func (q *Queries) ListProjectsByRepo(ctx context.Context, arg ListProjectsByRepo
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.UserID,
+			&i.AgentKeyHash,
+			&i.DiscordWebhookUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -222,7 +229,7 @@ func (q *Queries) ListProjectsByRepo(ctx context.Context, arg ListProjectsByRepo
 }
 
 const listProjectsForUser = `-- name: ListProjectsForUser :many
-SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id
+SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, created_at, updated_at, user_id, agent_key_hash, discord_webhook_url
 FROM projects
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -248,6 +255,8 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, userID *uuid.UUID) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.UserID,
+			&i.AgentKeyHash,
+			&i.DiscordWebhookUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -270,7 +279,7 @@ SET
     github_token_encrypted = $7,
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id
+RETURNING id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, created_at, updated_at, user_id, agent_key_hash, discord_webhook_url
 `
 
 type UpdateProjectParams struct {
@@ -302,10 +311,11 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.RepoBranch,
 		&i.DockerHost,
 		&i.GithubTokenEncrypted,
-		&i.DiscordWebhookUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UserID,
+		&i.AgentKeyHash,
+		&i.DiscordWebhookUrl,
 	)
 	return i, err
 }
