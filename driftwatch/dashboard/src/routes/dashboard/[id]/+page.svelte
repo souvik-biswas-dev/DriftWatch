@@ -22,7 +22,9 @@
 	let tickHandle: ReturnType<typeof setInterval> | null = null;
 	let resizeHandle: (() => void) | null = null;
 
-	$: projectId = $page.params.id;
+	// Route is /dashboard/[id], so params.id is always present at runtime; the
+	// ?? '' satisfies SvelteKit's string | undefined param typing.
+	$: projectId = $page.params.id ?? '';
 
 	async function loadDrifts() {
 		try {
