@@ -33,6 +33,7 @@ type Project struct {
 	RepoBranch           string             `json:"repo_branch"`
 	DockerHost           string             `json:"docker_host"`
 	GithubTokenEncrypted *string            `json:"github_token_encrypted"`
+	AgentKeyHash         string             `json:"agent_key_hash"`
 	DiscordWebhookUrl    string             `json:"discord_webhook_url"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
