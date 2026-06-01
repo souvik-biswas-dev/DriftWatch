@@ -9,7 +9,10 @@
 		if (browser) {
 			const token = localStorage.getItem('driftwatch_token');
 			if (!token) {
-				goto('/login');
+				// replaceState so /dashboard doesn't linger in history — otherwise
+				// pressing Back from /login lands on /dashboard, which bounces
+				// straight back to /login (a redirect trap).
+				goto('/login', { replaceState: true });
 				return;
 			}
 		}

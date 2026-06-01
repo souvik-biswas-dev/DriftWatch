@@ -13,9 +13,10 @@
 	let loading = false;
 
 	onMount(() => {
-		// If already signed in, skip the form.
+		// If already signed in, skip the form. replaceState so a logged-in user
+		// who hits /login doesn't get a dead Back button.
 		if (typeof localStorage !== 'undefined' && localStorage.getItem('driftwatch_token')) {
-			goto('/dashboard');
+			goto('/dashboard', { replaceState: true });
 		}
 	});
 
