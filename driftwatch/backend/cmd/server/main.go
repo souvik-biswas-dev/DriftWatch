@@ -236,15 +236,22 @@ func runMigrations(databaseURL string) error {
 }
 
 func corsMiddleware(allowedOrigin string) gin.HandlerFunc {
+	// Normalize the configured origins: trim spaces and any trailing slash, so
+	// "https://x.pages.dev/" and "https://x.pages.dev" both match the browser's
+	// Origin header (which never has a trailing slash).
 	allow := strings.Split(allowedOrigin, ",")
 	for i, v := range allow {
-		allow[i] = strings.TrimSpace(v)
+		allow[i] = strings.TrimRight(strings.TrimSpace(v), "/")
 	}
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 		if origin != "" {
+			reqOrigin := strings.TrimRight(origin, "/")
 			for _, a := range allow {
-				if a == "*" || a == origin {
+				// Exact match, wildcard, or any Cloudflare Pages preview
+				// subdomain of the configured project (*.driftwatch.pages.dev),
+				// since each deploy gets a new hashed subdomain.
+				if a == "*" || a == reqOrigin || isPagesPreview(reqOrigin, a) {
 					c.Header("Access-Control-Allow-Origin", origin)
 					c.Header("Vary", "Origin")
 					break
@@ -260,6 +267,22 @@ func corsMiddleware(allowedOrigin string) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// isPagesPreview reports whether reqOrigin is a Cloudflare Pages preview
+// subdomain of the configured production origin. E.g. allowed
+// "https://driftwatch.pages.dev" also accepts
+// "https://247bc5d9.driftwatch.pages.dev".
+func isPagesPreview(reqOrigin, allowed string) bool {
+	const scheme = "https://"
+	if !strings.HasPrefix(allowed, scheme) || !strings.HasPrefix(reqOrigin, scheme) {
+		return false
+	}
+	host := strings.TrimPrefix(allowed, scheme) // e.g. driftwatch.pages.dev
+	if !strings.HasSuffix(host, ".pages.dev") {
+		return false
+	}
+	return strings.HasSuffix(reqOrigin, "."+host)
 }
 
 func getenv(key, fallback string) string {
