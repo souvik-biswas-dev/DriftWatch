@@ -4,6 +4,16 @@ Autonomous infrastructure drift detection — continuously diffs live Docker sta
 
 **Stack:** Go · SvelteKit · Cloudflare Workers · Neon Postgres · Upstash Redis · Gemini 1.5 Flash
 
+> **Want to run or share it?** See **[SETUP.md](SETUP.md)** — a step-by-step,
+> 100% free-tier guide: what to create, where to get each value, how to host the
+> backend for free, and how anyone runs the agent on their own server.
+
+DriftWatch is a **multi-user tool**, not a single-project script. You host the
+backend once; then anyone can sign up, create a project, and run a small **agent**
+on their own server. The agent reads their local Docker and pushes the state to
+the backend over HTTPS — the backend never connects into a user's Docker host, so
+it's safe to share and works behind NAT/firewalls.
+
 ---
 
 ## Table of Contents
@@ -340,6 +350,25 @@ wrangler secret put DRIFTWATCH_SECRET
 wrangler deploy
 ```
 
+### Agent (run on the machine that has Docker)
+
+The agent reads your local Docker state and pushes it to the backend over HTTPS —
+it's the only thing an end user installs. Each project gets its own agent key
+(shown once when you create the project). Full walkthrough in **[SETUP.md](SETUP.md)**.
+
+```bash
+# build the image once (from the backend folder)
+cd driftwatch/backend
+docker build -f cmd/agent/Dockerfile -t driftwatch-agent .
+
+# run it on the server that runs your containers
+docker run -d --name driftwatch-agent --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -e DRIFTWATCH_URL="https://your-backend-url" \
+  -e DRIFTWATCH_AGENT_KEY="dw_...key shown when you created the project..." \
+  driftwatch-agent
+```
+
 ---
 
 ## Environment Variables
@@ -350,8 +379,8 @@ wrangler deploy
 | `REDIS_URL` | yes | Upstash Redis URL (`rediss://...`) |
 | `JWT_SECRET` | yes | Secret for signing JWTs |
 | `WEBHOOK_SECRET` | yes | Shared secret with Cloudflare Worker |
-| `GEMINI_API_KEY` | yes | Google AI Studio API key |
-| `GITHUB_TOKEN` | yes | GitHub PAT for fetching compose files |
+| `GEMINI_API_KEY` | no | Google AI Studio API key — **optional, AI is off by default**. Blank = no AI summaries |
+| `GITHUB_TOKEN` | no | GitHub PAT for fetching compose files — only needed for **private** repos |
 | `DISCORD_WEBHOOK_URL` | no | Discord channel webhook for alerts |
 | `PORT` | no | HTTP port (default `8080`) |
 | `ALLOWED_ORIGIN` | no | CORS origin (default `http://localhost:5173`) |
