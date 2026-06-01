@@ -41,6 +41,12 @@ services:
       - key: WEBHOOK_SECRET
         generateValue: true
 
-      # Comma-separated list of origins allowed by CORS.
+      # Encrypts users' per-project GitHub tokens at rest (AES-256-GCM).
+      # Required for multi-user; without it tokens are stored in plaintext.
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      # Comma-separated list of CORS origins. Set this to your deployed
+      # Cloudflare Pages dashboard URL in the Render dashboard after Part 3.
       - key: ALLOWED_ORIGIN
-        value: "https://driftwatch-dashboard.example.com"
+        sync: false
