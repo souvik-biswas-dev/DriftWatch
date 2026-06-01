@@ -8,6 +8,7 @@
 	import { projects } from '$lib/stores/projects';
 	import { api, ApiClientError } from '$lib/api';
 	import { timeAgo } from '$lib/utils';
+	import Logo from '$lib/Logo.svelte';
 	import type { CreateProjectInput, Project } from '$lib/types';
 
 	let dialogOpen = false;
@@ -119,8 +120,8 @@
 	<!-- Header -->
 	<header class="border-b border-neutral-900 bg-[#0a0a0a]/95 backdrop-blur">
 		<div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-			<a href="/" class="font-mono text-xl font-bold tracking-tight">
-				<span class="text-white">Drift</span><span style="color: var(--accent)">Watch</span>
+			<a href="/" class="transition-opacity hover:opacity-80">
+				<Logo size={26} wordClass="text-xl" />
 			</a>
 			<button
 				type="button"

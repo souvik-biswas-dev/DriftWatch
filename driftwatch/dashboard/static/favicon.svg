@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
+  <!-- radar "watch" rings centred on the declared state -->
+  <circle cx="13" cy="16" r="9" stroke="#00ff88" stroke-opacity="0.25" stroke-width="1.5"/>
+  <circle cx="13" cy="16" r="5.5" stroke="#00ff88" stroke-opacity="0.45" stroke-width="1.5"/>
+  <!-- declared state (centre node) -->
+  <circle cx="13" cy="16" r="2.2" fill="#00ff88"/>
+  <!-- drift vector to the divergent live node -->
+  <line x1="13" y1="16" x2="24" y2="9" stroke="#00ff88" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- drifted live state (bright, off-centre) -->
+  <circle cx="24" cy="9" r="2.8" fill="#00ff88"/>
+  <circle cx="24" cy="9" r="2.8" fill="#00ff88" opacity="0.35"/>
+</svg>
