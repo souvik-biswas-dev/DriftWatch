@@ -65,9 +65,9 @@ The key design choice: **the backend never connects into a user's Docker host.**
 The agent reads local Docker and pushes state *out*, so it's safe to share with
 strangers and works behind NAT/firewalls — the same model Datadog and Netdata use.
 
-> **Want to run or deploy it?** See **[SETUP.md](SETUP.md)** — a step-by-step,
-> 100% free-tier guide (Render + Cloudflare + Neon + Upstash): what to create,
-> where to get each value, and how a user runs the agent.
+> **Want to run or deploy it?** See the [Quick Start](#quick-start) and
+> [Environment Variables](#environment-variables) sections below — everything
+> runs on free tiers (Render + Cloudflare + Neon + Upstash).
 
 **Per-user, not operator-wide:** GitHub tokens (for private repos) and Discord
 webhooks are entered **per project** by each user — a user's private repo is read
@@ -438,7 +438,7 @@ wrangler deploy
 
 The agent reads your local Docker state and pushes it to the backend over HTTPS —
 it's the only thing an end user installs. Each project gets its own agent key
-(shown once when you create the project). Full walkthrough in **[SETUP.md](SETUP.md)**.
+(shown once when you create the project).
 
 ```bash
 # build the image once (from the backend folder)

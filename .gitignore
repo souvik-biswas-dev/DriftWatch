@@ -1,6 +1,9 @@
 cv.md
 .env
 
+# Local-only setup notes (kept out of the public repo)
+SETUP.md
+
 # Dependencies
 node_modules/
 
