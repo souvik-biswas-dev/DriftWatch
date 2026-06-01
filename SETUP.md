@@ -24,10 +24,16 @@ backend `.env` file (`driftwatch/backend/.env`).
 | **Neon Postgres** | ✅ Yes | https://neon.tech → sign up → **Create project** | The **Pooled** connection string → `DATABASE_URL` |
 | **Upstash Redis** | ✅ Yes | https://upstash.com → **Create Database** (Redis) | The `rediss://...` URL → `REDIS_URL` |
 | **JWT secret** | ✅ Yes | Run `openssl rand -base64 48` in a terminal | The output → `JWT_SECRET` |
-| **Webhook secret** | ✅ Yes | Run `openssl rand -base64 48` again | The output → `WEBHOOK_SECRET` (only matters if you deploy the Cloudflare worker) |
+| **Encryption key** | ✅ Yes | Run `openssl rand -base64 48` again | The output → `ENCRYPTION_KEY` (encrypts users' GitHub tokens) |
+| **GitHub OAuth App** | ✅ Yes | https://github.com/settings/developers → **New OAuth App** (steps below) | Client ID → `GITHUB_OAUTH_CLIENT_ID`, secret → `GITHUB_OAUTH_CLIENT_SECRET` |
+| **Webhook secret** | ⬜ Optional | Run `openssl rand -base64 48` again | The output → `WEBHOOK_SECRET` (only if you deploy the Cloudflare worker) |
 | **Gemini API key** | ⬜ Optional | https://aistudio.google.com/app/apikey → **Create API key** | The key → `GEMINI_API_KEY` (leave blank to disable AI) |
-| **GitHub token** | ⬜ Optional | https://github.com/settings/tokens → **Fine-grained token** with `Contents: Read-only` | The token → `GITHUB_TOKEN` (only needed for **private** repos; public repos need nothing) |
-| **Discord webhook** | ⬜ Optional | Discord channel → **Edit → Integrations → Webhooks → New Webhook → Copy URL** | The URL → `DISCORD_WEBHOOK_URL` (leave blank to disable alerts) |
+| **Discord webhook** | ⬜ Per-user | Each user sets their own in the dashboard | (operator leaves `DISCORD_WEBHOOK_URL` blank) |
+
+> **Sign-in is GitHub OAuth.** Users log in with "Continue with GitHub" — there is
+> no email/password signup. The OAuth App is therefore required. The `repo` scope
+> granted at login is reused (encrypted) to read users' private compose files, so
+> users don't paste a separate GitHub token for private repos.
 
 ### Step-by-step for the two required services
 
@@ -46,7 +52,25 @@ backend `.env` file (`driftwatch/backend/.env`).
    `rediss://` (the TLS one).
 4. Paste it as `REDIS_URL` in `.env`.
 
-That's the minimum. With just Neon + Upstash + the two secrets, DriftWatch runs.
+**GitHub OAuth App (sign-in)**
+1. Go to https://github.com/settings/developers → **OAuth Apps** → **New OAuth App**.
+2. Fill in:
+   - **Application name:** DriftWatch (anything)
+   - **Homepage URL:** your dashboard URL — locally `http://localhost:5173`, in prod
+     your Cloudflare Pages URL (e.g. `https://driftwatch.pages.dev`)
+   - **Authorization callback URL:** `<BACKEND_URL>/api/auth/github/callback`
+     — locally `http://localhost:8080/api/auth/github/callback`, in prod
+     `https://driftwatch-xxxx.onrender.com/api/auth/github/callback`
+3. Click **Register application**. Copy the **Client ID** → `GITHUB_OAUTH_CLIENT_ID`.
+4. Click **Generate a new client secret**, copy it → `GITHUB_OAUTH_CLIENT_SECRET`.
+5. Also set `DASHBOARD_URL` (your Pages/dev URL) and, in prod, `BACKEND_URL`
+   (your Render URL) so the redirect_uri matches the callback above exactly.
+
+> ⚠️ The callback URL in the OAuth App must match `<BACKEND_URL>/api/auth/github/callback`
+> **exactly** (scheme + host + path), or GitHub rejects the login. Create a second
+> OAuth App if you want separate local-dev and production callbacks.
+
+That's the minimum to run: Neon + Upstash + JWT/encryption secrets + the OAuth App.
 
 ---
 

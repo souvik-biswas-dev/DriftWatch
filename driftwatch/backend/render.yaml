@@ -50,3 +50,16 @@ services:
       # Cloudflare Pages dashboard URL in the Render dashboard after Part 3.
       - key: ALLOWED_ORIGIN
         sync: false
+
+      # GitHub OAuth (sign-in) — create an OAuth App and set these in the
+      # Render dashboard. Callback URL must be <BACKEND_URL>/api/auth/github/callback.
+      - key: GITHUB_OAUTH_CLIENT_ID
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false
+      # Dashboard URL the OAuth callback returns users to (your Pages URL).
+      - key: DASHBOARD_URL
+        sync: false
+      # This service's own external URL (e.g. https://driftwatch-xxxx.onrender.com).
+      - key: BACKEND_URL
+        sync: false
