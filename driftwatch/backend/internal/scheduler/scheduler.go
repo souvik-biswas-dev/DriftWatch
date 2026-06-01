@@ -17,8 +17,8 @@ import (
 
 	"github.com/YOURUSERNAME/driftwatch/internal/agent"
 	"github.com/YOURUSERNAME/driftwatch/internal/alerts"
+	"github.com/YOURUSERNAME/driftwatch/internal/crypto"
 	"github.com/YOURUSERNAME/driftwatch/internal/db"
-	"github.com/YOURUSERNAME/driftwatch/internal/docker"
 	"github.com/YOURUSERNAME/driftwatch/internal/gemini"
 	"github.com/YOURUSERNAME/driftwatch/internal/github"
 )
@@ -135,14 +135,11 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	dc, err := docker.NewClient(project.DockerHost)
+	// Live state is supplied by the project's agent and cached in Redis. The
+	// backend never connects to the user's Docker host directly.
+	live, err := s.lastLiveState(ctx, project.ID)
 	if err != nil {
-		log.Error("docker client init", "error", err)
-		return
-	}
-	live, err := dc.FetchLiveState(ctx)
-	if err != nil {
-		log.Error("fetch live state", "error", err)
+		log.Info("no agent state cached yet; skipping scan", "error", err)
 		return
 	}
 
@@ -167,7 +164,19 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 		log.Error("redis set", "key", redisKey, "error", err)
 	}
 
-	declared, err := s.githubClient.FetchDeclaredConfig(ctx, project.RepoOwner, project.RepoName, project.RepoBranch)
+	// Decrypt the project's own GitHub token (for private repos). Empty token
+	// falls back to unauthenticated/operator access — fine for public repos.
+	ghToken := ""
+	if project.GithubTokenEncrypted != nil && *project.GithubTokenEncrypted != "" {
+		tok, decErr := crypto.Decrypt(*project.GithubTokenEncrypted)
+		if decErr != nil {
+			log.Error("decrypt github token", "error", decErr)
+		} else {
+			ghToken = tok
+		}
+	}
+
+	declared, err := s.githubClient.FetchDeclaredConfigWithToken(ctx, project.RepoOwner, project.RepoName, project.RepoBranch, ghToken)
 	if err != nil {
 		log.Error("fetch declared config", "error", err)
 		return
@@ -252,8 +261,14 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 		}
 	}
 
-	if err := s.alertsClient.SendDriftAlert(project.Name, analysis, drifts); err != nil {
+	// Alert to the project's own Discord webhook. Empty URL is a clean no-op,
+	// so users who don't configure Discord simply get no alert (no error).
+	if err := s.alertsClient.SendDriftAlertTo(project.DiscordWebhookUrl, project.Name, analysis, drifts); err != nil {
 		log.Error("discord alert", "error", err)
+		return
+	}
+	if project.DiscordWebhookUrl == "" {
+		log.Info("scan complete (no discord webhook configured)", "drift_count", len(drifts))
 		return
 	}
 
