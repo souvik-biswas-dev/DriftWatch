@@ -14,7 +14,9 @@
 	let drifts: DriftEvent[] = [];
 	let loading = true;
 
-	$: projectId = $page.params.id;
+	// Route is /dashboard/[id], so params.id is always present at runtime; the
+	// ?? '' satisfies SvelteKit's string | undefined param typing.
+	$: projectId = $page.params.id ?? '';
 
 	async function load() {
 		loading = true;
