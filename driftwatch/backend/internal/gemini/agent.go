@@ -10,13 +10,19 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/YOURUSERNAME/driftwatch/internal/agent"
 )
 
-const defaultBaseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+// defaultModel is on the Gemini free tier. Override with GEMINI_MODEL, e.g.
+// gemini-2.5-flash-lite, gemini-2.0-flash. gemini-1.5-* is being retired.
+const (
+	defaultModel    = "gemini-2.5-flash"
+	baseURLTemplate = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
+)
 
 type AnalysisResult struct {
 	Severity       string         `json:"severity"`
@@ -40,9 +46,13 @@ type Client struct {
 }
 
 func NewClient(apiKey string) *Client {
+	model := os.Getenv("GEMINI_MODEL")
+	if model == "" {
+		model = defaultModel
+	}
 	return &Client{
 		apiKey:     apiKey,
-		baseURL:    defaultBaseURL,
+		baseURL:    fmt.Sprintf(baseURLTemplate, model),
 		http:       &http.Client{Timeout: 30 * time.Second},
 		retryDelay: 2 * time.Second,
 	}
