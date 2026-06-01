@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -24,20 +26,29 @@ type API struct {
 	scheduler     SchedulerAPI
 	jwtSecret     []byte
 	webhookSecret string
+	oauth         OAuthConfig
 }
 
-func New(queries *db.Queries, scheduler SchedulerAPI, jwtSecret, webhookSecret string) *API {
+func New(queries *db.Queries, scheduler SchedulerAPI, jwtSecret, webhookSecret string, oauth OAuthConfig) *API {
 	return &API{
 		queries:       queries,
 		scheduler:     scheduler,
 		jwtSecret:     []byte(jwtSecret),
 		webhookSecret: webhookSecret,
+		oauth:         oauth,
 	}
 }
 
 func (a *API) RegisterRoutes(r *gin.Engine) {
+	// Legacy email/password (kept for backward compatibility; the dashboard now
+	// uses GitHub OAuth exclusively).
 	r.POST("/api/auth/register", a.handleRegister)
 	r.POST("/api/auth/login", a.handleLogin)
+
+	// GitHub OAuth: browser hits /login → redirected to GitHub → /callback issues
+	// a JWT and redirects back to the dashboard.
+	r.GET("/api/auth/github/login", a.handleGithubLogin)
+	r.GET("/api/auth/github/callback", a.handleGithubCallback)
 
 	// Internal webhook — verified by shared-secret header, not JWT.
 	r.POST("/api/webhook/github", a.handleGitHubWebhook)
@@ -48,6 +59,8 @@ func (a *API) RegisterRoutes(r *gin.Engine) {
 	protected := r.Group("/api")
 	protected.Use(a.authMiddleware())
 	{
+		protected.GET("/me", a.handleMe)
+
 		protected.POST("/projects", a.handleCreateProject)
 		protected.GET("/projects", a.handleListProjects)
 		protected.GET("/projects/:id", a.handleGetProject)
@@ -57,6 +70,27 @@ func (a *API) RegisterRoutes(r *gin.Engine) {
 		protected.GET("/projects/:id/drifts/:driftId", a.handleGetDrift)
 		protected.POST("/projects/:id/drifts/:driftId/resolve", a.handleResolveDrift)
 	}
+}
+
+// handleMe returns the authenticated user's public profile (for the dashboard
+// header avatar/login).
+func (a *API) handleMe(c *gin.Context) {
+	uid, ok := currentUserID(c)
+	if !ok {
+		respondError(c, http.StatusUnauthorized, "auth required", "AUTH_MISSING")
+		return
+	}
+	u, err := a.queries.GetUserProfile(c.Request.Context(), uid)
+	if err != nil {
+		respondError(c, http.StatusNotFound, "user not found", "NOT_FOUND")
+		return
+	}
+	respond(c, http.StatusOK, gin.H{
+		"id":           u.ID,
+		"email":        u.Email,
+		"github_login": u.GithubLogin,
+		"avatar_url":   u.AvatarURL,
+	}, "")
 }
 
 // respond writes a success envelope: {"data": ..., "message": "..."}.

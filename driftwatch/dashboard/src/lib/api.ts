@@ -14,6 +14,9 @@ const BASE: string =
 	(typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) ||
 	'http://localhost:8080';
 
+/** Backend base URL, exported for full-page redirects (GitHub OAuth). */
+export const API_BASE = BASE;
+
 const TOKEN_KEY = 'driftwatch_token';
 
 function getToken(): string | null {

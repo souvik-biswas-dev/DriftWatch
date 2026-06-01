@@ -64,7 +64,12 @@ func (a *API) handleLogin(c *gin.Context) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	// GitHub-OAuth users have no password set; reject password login for them.
+	if user.PasswordHash == nil || *user.PasswordHash == "" {
+		respondError(c, http.StatusUnauthorized, "invalid credentials", "INVALID_CREDENTIALS")
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
 		respondError(c, http.StatusUnauthorized, "invalid credentials", "INVALID_CREDENTIALS")
 		return
 	}
