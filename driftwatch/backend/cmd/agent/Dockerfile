@@ -2,7 +2,7 @@
 # DriftWatch agent — runs on the user's own host next to their Docker daemon.
 # Build from the backend/ directory:
 #   docker build -f cmd/agent/Dockerfile -t driftwatch-agent .
-FROM golang:1.23-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
