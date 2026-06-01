@@ -22,6 +22,7 @@ import (
 
 	"github.com/YOURUSERNAME/driftwatch/internal/alerts"
 	"github.com/YOURUSERNAME/driftwatch/internal/api"
+	"github.com/YOURUSERNAME/driftwatch/internal/crypto"
 	"github.com/YOURUSERNAME/driftwatch/internal/db"
 	"github.com/YOURUSERNAME/driftwatch/internal/gemini"
 	"github.com/YOURUSERNAME/driftwatch/internal/github"
@@ -51,6 +52,14 @@ func run() error {
 	discordURL := os.Getenv("DISCORD_WEBHOOK_URL")
 	webhookSecret := os.Getenv("WEBHOOK_SECRET")
 	allowedOrigin := getenv("ALLOWED_ORIGIN", "http://localhost:5173")
+
+	// Encryption key for users' per-project GitHub tokens at rest. Optional for
+	// local dev (tokens stored plaintext) but REQUIRED for a real multi-user
+	// deploy. Warn loudly if unset so it isn't forgotten in production.
+	crypto.Init(os.Getenv("ENCRYPTION_KEY"))
+	if !crypto.Enabled() {
+		slog.Warn("ENCRYPTION_KEY not set — per-project GitHub tokens will be stored UNENCRYPTED; set it before going multi-user")
+	}
 
 	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
