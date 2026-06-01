@@ -72,7 +72,20 @@ func uniqueContainerCount(drifts []agent.DriftEvent) int {
 	return len(seen)
 }
 
+// SendDriftAlert posts to the client's configured webhook URL. Kept for
+// backward compatibility; multi-user callers use SendDriftAlertTo with the
+// project's own webhook.
 func (c *Client) SendDriftAlert(projectName string, result *gemini.AnalysisResult, drifts []agent.DriftEvent) error {
+	return c.SendDriftAlertTo(c.webhookURL, projectName, result, drifts)
+}
+
+// SendDriftAlertTo posts a drift alert to a specific Discord webhook URL. An
+// empty URL is a no-op (returns nil) — alerts are opt-in per project, so a user
+// who doesn't configure Discord simply gets no alert, and no error is logged.
+func (c *Client) SendDriftAlertTo(webhookURL, projectName string, result *gemini.AnalysisResult, drifts []agent.DriftEvent) error {
+	if webhookURL == "" {
+		return nil
+	}
 	if result == nil {
 		return errors.New("alerts: AnalysisResult is nil")
 	}
@@ -102,7 +115,7 @@ func (c *Client) SendDriftAlert(projectName string, result *gemini.AnalysisResul
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.webhookURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("build discord request: %w", err)
 	}

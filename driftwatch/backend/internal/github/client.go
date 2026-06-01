@@ -18,13 +18,20 @@ type Client struct {
 	gh *gogithub.Client
 }
 
-func NewClient(token string) *Client {
+// newGHClient builds a go-github client. Empty token → unauthenticated (works
+// for public repos, 60 req/hr per IP). With a token → authenticated (private
+// repos + higher rate limit).
+func newGHClient(token string) *gogithub.Client {
 	if token == "" {
-		return &Client{gh: gogithub.NewClient(nil)}
+		return gogithub.NewClient(nil)
 	}
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-	tc := oauth2.NewClient(context.Background(), ts)
-	return &Client{gh: gogithub.NewClient(tc)}
+	return gogithub.NewClient(oauth2.NewClient(context.Background(), ts))
+}
+
+// NewClient builds a client with an optional operator-wide fallback token.
+func NewClient(token string) *Client {
+	return &Client{gh: newGHClient(token)}
 }
 
 type DockerCompose struct {
@@ -37,8 +44,25 @@ type Service struct {
 	Ports       []string    `yaml:"ports"`
 }
 
+// FetchDeclaredConfigWithToken fetches a project's declared compose using a
+// per-project token. Empty token falls back to the client's default (operator)
+// credentials — fine for public repos. This is what the multi-user scheduler
+// calls so each user's private repo is read with that user's own token.
+func (c *Client) FetchDeclaredConfigWithToken(ctx context.Context, owner, repo, branch, token string) (*docker.LiveSnapshot, error) {
+	gh := c.gh
+	if token != "" {
+		gh = newGHClient(token)
+	}
+	return fetchDeclaredConfig(ctx, gh, owner, repo, branch)
+}
+
+// FetchDeclaredConfig uses the client's default credentials (backward compatible).
 func (c *Client) FetchDeclaredConfig(ctx context.Context, owner, repo, branch string) (*docker.LiveSnapshot, error) {
-	fileContent, _, resp, err := c.gh.Repositories.GetContents(
+	return fetchDeclaredConfig(ctx, c.gh, owner, repo, branch)
+}
+
+func fetchDeclaredConfig(ctx context.Context, gh *gogithub.Client, owner, repo, branch string) (*docker.LiveSnapshot, error) {
+	fileContent, _, resp, err := gh.Repositories.GetContents(
 		ctx,
 		owner, repo, "docker-compose.yml",
 		&gogithub.RepositoryContentGetOptions{Ref: branch},
