@@ -115,9 +115,9 @@
 
 			{#if project}
 				<div class="rounded-lg border border-neutral-900 bg-[#111] p-4">
-					<div class="font-mono text-xs text-neutral-500">Docker host</div>
-					<div class="mt-1 truncate font-mono text-xs text-neutral-300" title={project.docker_host}>
-						{project.docker_host}
+					<div class="font-mono text-xs text-neutral-500">Source</div>
+					<div class="mt-1 truncate font-mono text-xs text-neutral-300" title="Live state pushed by the DriftWatch agent">
+						agent push
 					</div>
 				</div>
 			{/if}

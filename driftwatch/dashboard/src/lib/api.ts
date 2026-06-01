@@ -3,6 +3,7 @@ import type {
 	DriftEvent,
 	User,
 	CreateProjectInput,
+	CreateProjectResult,
 	LoginResponse,
 	ProjectDetail,
 	ApiSuccess,
@@ -39,7 +40,9 @@ export class ApiClientError extends Error {
 	}
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+// requestRaw performs the fetch + shared error handling and returns the full
+// parsed response body (the whole {data, message, ...} envelope).
+async function requestRaw(path: string, init: RequestInit = {}): Promise<any> {
 	const headers = new Headers(init.headers);
 	if (!headers.has('Content-Type') && init.body) {
 		headers.set('Content-Type', 'application/json');
@@ -74,7 +77,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 		);
 	}
 
-	return ((body as ApiSuccess<T>) ?? { data: null as T }).data;
+	return body;
+}
+
+// request returns just the `data` payload of the success envelope.
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+	const body = (await requestRaw(path, init)) as ApiSuccess<T> | null;
+	return (body ?? { data: null as T }).data;
 }
 
 export const api = {
@@ -91,11 +100,15 @@ export const api = {
 
 	listProjects: () => request<Project[]>('/api/projects'),
 	getProject: (id: string) => request<ProjectDetail>(`/api/projects/${id}`),
-	createProject: (input: CreateProjectInput) =>
-		request<Project>('/api/projects', {
+	createProject: async (input: CreateProjectInput): Promise<CreateProjectResult> => {
+		// The create response is {data: project, agent_key, message}; we need the
+		// sibling agent_key, so read the full envelope instead of just `data`.
+		const body = await requestRaw('/api/projects', {
 			method: 'POST',
 			body: JSON.stringify(input)
-		}),
+		});
+		return { project: body.data as Project, agent_key: body.agent_key as string };
+	},
 	deleteProject: (id: string) =>
 		request<null>(`/api/projects/${id}`, { method: 'DELETE' }),
 
