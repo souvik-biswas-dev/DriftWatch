@@ -226,6 +226,11 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 	}
 	saved := make([]savedDrift, 0, len(drifts))
 	for _, d := range drifts {
+		// Skip if an identical unresolved drift already exists — prevents
+		// duplicate events accumulating on every scan cycle.
+		if exists, _ := s.dbQueries.HasOpenDriftEvent(ctx, project.ID, d.ContainerName, d.Type); exists {
+			continue
+		}
 		liveVal := d.LiveValue
 		decVal := d.DeclaredValue
 		evt, err := s.dbQueries.CreateDriftEvent(ctx, db.CreateDriftEventParams{
