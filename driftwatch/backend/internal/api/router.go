@@ -8,12 +8,10 @@ import (
 
 	"github.com/souvik-biswas-dev/driftwatch/internal/db"
 	"github.com/souvik-biswas-dev/driftwatch/internal/docker"
+	"github.com/souvik-biswas-dev/driftwatch/internal/github"
 )
 
 // SchedulerAPI is the subset of the scheduler that the HTTP layer drives.
-// The concrete scheduler.Scheduler must satisfy this interface — note
-// UnregisterProject and TriggerScan are new methods that still need to be
-// added to internal/scheduler/scheduler.go.
 type SchedulerAPI interface {
 	RegisterProject(p db.Project)
 	UnregisterProject(projectID uuid.UUID)
@@ -24,15 +22,17 @@ type SchedulerAPI interface {
 type API struct {
 	queries       *db.Queries
 	scheduler     SchedulerAPI
+	githubClient  *github.Client
 	jwtSecret     []byte
 	webhookSecret string
 	oauth         OAuthConfig
 }
 
-func New(queries *db.Queries, scheduler SchedulerAPI, jwtSecret, webhookSecret string, oauth OAuthConfig) *API {
+func New(queries *db.Queries, scheduler SchedulerAPI, githubClient *github.Client, jwtSecret, webhookSecret string, oauth OAuthConfig) *API {
 	return &API{
 		queries:       queries,
 		scheduler:     scheduler,
+		githubClient:  githubClient,
 		jwtSecret:     []byte(jwtSecret),
 		webhookSecret: webhookSecret,
 		oauth:         oauth,
@@ -69,6 +69,10 @@ func (a *API) RegisterRoutes(r *gin.Engine) {
 		protected.GET("/projects/:id/drifts", a.handleListDrifts)
 		protected.GET("/projects/:id/drifts/:driftId", a.handleGetDrift)
 		protected.POST("/projects/:id/drifts/:driftId/resolve", a.handleResolveDrift)
+
+		// GitHub repo/branch picker — returns data from the user's own OAuth token.
+		protected.GET("/github/repos", a.handleListUserRepos)
+		protected.GET("/github/repos/:owner/:repo/branches", a.handleListRepoBranches)
 	}
 }
 

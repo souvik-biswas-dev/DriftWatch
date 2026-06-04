@@ -141,7 +141,7 @@ func run() error {
 	defer sched.Stop()
 
 	// 8. HTTP layer.
-	apiSrv := api.New(queries, sched, jwtSecret, webhookSecret, oauthCfg)
+	apiSrv := api.New(queries, sched, ghClient, jwtSecret, webhookSecret, oauthCfg)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
