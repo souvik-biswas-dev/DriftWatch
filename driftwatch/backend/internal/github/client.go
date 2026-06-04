@@ -34,6 +34,74 @@ func NewClient(token string) *Client {
 	return &Client{gh: newGHClient(token)}
 }
 
+type Repo struct {
+	FullName    string `json:"full_name"`
+	Name        string `json:"name"`
+	Owner       string `json:"owner"`
+	Private     bool   `json:"private"`
+	Description string `json:"description"`
+}
+
+type Branch struct {
+	Name string `json:"name"`
+}
+
+// ListUserRepos returns all repos (public + private) the token can access,
+// across all pages. Used by the dashboard repo picker.
+func (c *Client) ListUserRepos(ctx context.Context, token string) ([]Repo, error) {
+	gh := newGHClient(token)
+	var all []Repo
+	opts := &gogithub.RepositoryListByAuthenticatedUserOptions{
+		Sort:        "updated",
+		ListOptions: gogithub.ListOptions{PerPage: 100},
+	}
+	for {
+		repos, resp, err := gh.Repositories.ListByAuthenticatedUser(ctx, opts)
+		if err != nil {
+			return nil, fmt.Errorf("github: list repos: %w", err)
+		}
+		for _, r := range repos {
+			owner := ""
+			if r.Owner != nil {
+				owner = r.Owner.GetLogin()
+			}
+			all = append(all, Repo{
+				FullName:    r.GetFullName(),
+				Name:        r.GetName(),
+				Owner:       owner,
+				Private:     r.GetPrivate(),
+				Description: r.GetDescription(),
+			})
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return all, nil
+}
+
+// ListRepoBranches returns all branches for a repo.
+func (c *Client) ListRepoBranches(ctx context.Context, owner, repo, token string) ([]Branch, error) {
+	gh := newGHClient(token)
+	var all []Branch
+	opts := &gogithub.BranchListOptions{ListOptions: gogithub.ListOptions{PerPage: 100}}
+	for {
+		branches, resp, err := gh.Repositories.ListBranches(ctx, owner, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("github: list branches: %w", err)
+		}
+		for _, b := range branches {
+			all = append(all, Branch{Name: b.GetName()})
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return all, nil
+}
+
 type DockerCompose struct {
 	Services map[string]Service `yaml:"services"`
 }

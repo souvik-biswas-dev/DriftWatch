@@ -13,16 +13,18 @@
 
 	let dialogOpen = false;
 	let submitting = false;
-	let form: CreateProjectInput = {
-		name: '',
-		repo_owner: '',
-		repo_name: '',
-		repo_branch: 'main'
-	};
+	let projectName = '';
 
-	// After a project is created the backend returns a one-time agent key.
-	// We reveal it in a dedicated dialog with the exact `docker run` command,
-	// because it is never retrievable again.
+	// Repo picker state
+	type GHRepo = { full_name: string; name: string; owner: string; private: boolean; description: string };
+	let repos: GHRepo[] = [];
+	let reposLoading = false;
+	let selectedRepo: GHRepo | null = null;
+	let branches: string[] = [];
+	let branchesLoading = false;
+	let selectedBranch = 'main';
+
+	// One-time agent key reveal
 	let keyDialogOpen = false;
 	let newAgentKey = '';
 	let newProjectName = '';
@@ -42,13 +44,39 @@
 		`  SCAN_INTERVAL=30s \\\n` +
 		`  ./driftwatch-agent > driftwatch-agent.log 2>&1 &`;
 
-	function resetForm() {
-		form = {
-			name: '',
-			repo_owner: '',
-			repo_name: '',
-			repo_branch: 'main'
-		};
+	async function openDialog() {
+		dialogOpen = true;
+		projectName = '';
+		selectedRepo = null;
+		branches = [];
+		selectedBranch = 'main';
+		reposLoading = true;
+		try {
+			repos = await api.listGithubRepos();
+		} catch {
+			toast.error('Could not load GitHub repos — make sure you signed in with GitHub');
+		} finally {
+			reposLoading = false;
+		}
+	}
+
+	async function selectRepo(repo: GHRepo) {
+		selectedRepo = repo;
+		if (!projectName) projectName = repo.name;
+		branches = [];
+		selectedBranch = 'main';
+		branchesLoading = true;
+		try {
+			const bs = await api.listRepoBranches(repo.owner, repo.name);
+			branches = bs.map((b) => b.name);
+			if (branches.length > 0 && !branches.includes('main')) {
+				selectedBranch = branches[0];
+			}
+		} catch {
+			toast.error('Could not load branches');
+		} finally {
+			branchesLoading = false;
+		}
 	}
 
 	async function copyKey() {
@@ -70,18 +98,21 @@
 	}
 
 	async function handleCreate() {
-		if (!form.name || !form.repo_owner || !form.repo_name) {
-			toast.error('Please fill in all required fields');
+		if (!projectName || !selectedRepo) {
+			toast.error('Pick a repo first');
 			return;
 		}
 		submitting = true;
 		try {
-			const { project, agent_key } = await api.createProject(form);
+			const { project, agent_key } = await api.createProject({
+				name: projectName,
+				repo_owner: selectedRepo.owner,
+				repo_name: selectedRepo.name,
+				repo_branch: selectedBranch
+			});
 			projects.add(project);
 			toast.success(`Project "${project.name}" created`);
 			dialogOpen = false;
-			resetForm();
-			// Surface the one-time agent key.
 			newAgentKey = agent_key;
 			newProjectName = project.name;
 			keyDialogOpen = true;
@@ -92,7 +123,6 @@
 			submitting = false;
 		}
 	}
-
 
 	onMount(() => {
 		projects.load();
@@ -114,7 +144,7 @@
 			</a>
 			<button
 				type="button"
-				on:click={() => (dialogOpen = true)}
+				on:click={openDialog}
 				class="rounded-md px-4 py-2 font-mono text-sm font-semibold transition-all hover:scale-105"
 				style="background: var(--accent); color: #0a0a0a;"
 			>
@@ -162,7 +192,7 @@
 				</p>
 				<button
 					type="button"
-					on:click={() => (dialogOpen = true)}
+					on:click={openDialog}
 					class="rounded-md px-6 py-2 font-mono text-sm font-semibold transition-transform hover:scale-105"
 					style="background: var(--accent); color: #0a0a0a;"
 				>
@@ -218,8 +248,7 @@
 				<div>
 					<Dialog.Title class="font-mono text-lg font-bold text-white">New Project</Dialog.Title>
 					<Dialog.Description class="mt-0.5 text-xs text-neutral-500">
-						Point at the GitHub repo holding your docker-compose.yml. You'll get an
-						agent key to run on your server.
+						Pick a repo with a docker-compose.yml. You'll get an agent key to run on your server.
 					</Dialog.Description>
 				</div>
 				<Dialog.Close class="rounded-md p-1 text-neutral-500 transition-colors hover:bg-neutral-900 hover:text-white">
@@ -231,64 +260,91 @@
 
 			<form on:submit|preventDefault={handleCreate} class="flex flex-1 flex-col overflow-y-auto">
 				<div class="space-y-5 px-6 py-6">
+
+					<!-- Repo picker -->
 					<div>
-						<label for="np-name" class="mb-1.5 block font-mono text-xs uppercase tracking-widest text-neutral-400">
-							Project Name
-						</label>
-						<input
-							id="np-name"
-							type="text"
-							bind:value={form.name}
-							placeholder="acme-prod"
-							required
-							class="w-full rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-white placeholder-neutral-600 focus:border-[#00ff88] focus:outline-none focus:ring-1 focus:ring-[#00ff88]/50"
-						/>
+						<div class="mb-1.5 font-mono text-xs uppercase tracking-widest text-neutral-400">
+							GitHub Repository
+						</div>
+						{#if reposLoading}
+							<div class="flex items-center gap-2 rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-3 text-xs text-neutral-500">
+								<svg class="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+								</svg>
+								Loading your repos…
+							</div>
+						{:else if repos.length === 0}
+							<div class="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-3 font-mono text-xs text-red-400">
+								No repos found. Make sure you signed in with GitHub.
+							</div>
+						{:else}
+							<div class="max-h-56 overflow-y-auto rounded-md border border-neutral-800 bg-[#0a0a0a]">
+								{#each repos as repo (repo.full_name)}
+									<button
+										type="button"
+										on:click={() => selectRepo(repo)}
+										class="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-neutral-900
+											{selectedRepo?.full_name === repo.full_name ? 'bg-[#00ff88]/10 border-l-2 border-[#00ff88]' : ''}"
+									>
+										<div class="min-w-0">
+											<div class="truncate font-mono text-sm text-white">{repo.full_name}</div>
+											{#if repo.description}
+												<div class="truncate font-mono text-xs text-neutral-500">{repo.description}</div>
+											{/if}
+										</div>
+										{#if repo.private}
+											<span class="ml-2 shrink-0 rounded border border-neutral-700 px-1.5 py-0.5 font-mono text-xs text-neutral-500">private</span>
+										{/if}
+									</button>
+								{/each}
+							</div>
+						{/if}
 					</div>
 
-					<div>
-						<label for="np-repo-owner" class="mb-1.5 block font-mono text-xs uppercase tracking-widest text-neutral-400">
-							GitHub Repository
-						</label>
-						<div class="flex gap-2">
+					<!-- Branch picker — shown after repo selected -->
+					{#if selectedRepo}
+						<div>
+							<label for="np-branch" class="mb-1.5 block font-mono text-xs uppercase tracking-widest text-neutral-400">
+								Branch
+							</label>
+							{#if branchesLoading}
+								<div class="flex items-center gap-2 rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 text-xs text-neutral-500">
+									<svg class="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+									</svg>
+									Loading branches…
+								</div>
+							{:else}
+								<select
+									id="np-branch"
+									bind:value={selectedBranch}
+									class="w-full rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-white focus:border-[#00ff88] focus:outline-none"
+								>
+									{#each branches as b (b)}
+										<option value={b}>{b}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+
+						<!-- Project name — auto-filled from repo, editable -->
+						<div>
+							<label for="np-name" class="mb-1.5 block font-mono text-xs uppercase tracking-widest text-neutral-400">
+								Project Name
+							</label>
 							<input
-								id="np-repo-owner"
+								id="np-name"
 								type="text"
-								bind:value={form.repo_owner}
-								placeholder="owner"
+								bind:value={projectName}
+								placeholder="my-project"
 								required
-								class="w-1/2 rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-white placeholder-neutral-600 focus:border-[#00ff88] focus:outline-none focus:ring-1 focus:ring-[#00ff88]/50"
-							/>
-							<span class="flex items-center font-mono text-neutral-600">/</span>
-							<input
-								type="text"
-								bind:value={form.repo_name}
-								placeholder="repo"
-								required
-								class="w-1/2 rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-white placeholder-neutral-600 focus:border-[#00ff88] focus:outline-none focus:ring-1 focus:ring-[#00ff88]/50"
+								class="w-full rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-white placeholder-neutral-600 focus:border-[#00ff88] focus:outline-none focus:ring-1 focus:ring-[#00ff88]/50"
 							/>
 						</div>
-					</div>
+					{/if}
 
-					<div>
-						<label for="np-branch" class="mb-1.5 block font-mono text-xs uppercase tracking-widest text-neutral-400">
-							Branch
-						</label>
-						<input
-							id="np-branch"
-							type="text"
-							bind:value={form.repo_branch}
-							placeholder="main"
-							class="w-full rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-white placeholder-neutral-600 focus:border-[#00ff88] focus:outline-none focus:ring-1 focus:ring-[#00ff88]/50"
-						/>
-					</div>
-
-					<div class="rounded-md border border-neutral-800 bg-[#0a0a0a] px-3 py-3">
-						<p class="font-mono text-xs leading-relaxed text-neutral-500">
-							<span class="text-neutral-300">No Docker host needed.</span> After creating
-							the project you'll get a one-time agent key. Run the DriftWatch agent on the
-							server where your containers live and it pushes state here automatically.
-						</p>
-					</div>
 				</div>
 
 				<div class="mt-auto flex items-center justify-end gap-3 border-t border-neutral-900 px-6 py-4">
@@ -297,7 +353,7 @@
 					</Dialog.Close>
 					<button
 						type="submit"
-						disabled={submitting}
+						disabled={submitting || !selectedRepo}
 						class="rounded-md px-4 py-2 font-mono text-sm font-semibold transition-all hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
 						style="background: var(--accent); color: #0a0a0a;"
 					>

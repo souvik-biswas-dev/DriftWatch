@@ -115,6 +115,10 @@ export const api = {
 	deleteProject: (id: string) =>
 		request<null>(`/api/projects/${id}`, { method: 'DELETE' }),
 
+	listGithubRepos: () => request<{ full_name: string; name: string; owner: string; private: boolean; description: string }[]>('/api/github/repos'),
+	listRepoBranches: (owner: string, repo: string) =>
+		request<{ name: string }[]>(`/api/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches`),
+
 	listDrifts: (projectId: string) =>
 		request<DriftEvent[]>(`/api/projects/${projectId}/drifts`),
 	getDrift: (projectId: string, driftId: string) =>
