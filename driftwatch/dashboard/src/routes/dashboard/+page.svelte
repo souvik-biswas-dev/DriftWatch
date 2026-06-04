@@ -93,21 +93,6 @@
 		}
 	}
 
-	// We don't have a drift-count endpoint per project yet; this is a
-	// placeholder badge style chosen randomly per project until the API
-	// surfaces aggregates. Rendered deterministically by project ID.
-	function driftBadge(p: Project): { count: number; level: 'green' | 'yellow' | 'red' } {
-		const seed = p.id.charCodeAt(0) + p.id.charCodeAt(p.id.length - 1);
-		const count = seed % 7;
-		const level = count === 0 ? 'green' : count <= 2 ? 'yellow' : 'red';
-		return { count, level };
-	}
-
-	const badgeClasses = {
-		green: 'bg-green-500/15 text-green-400 border-green-500/30',
-		yellow: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-		red: 'bg-red-500/15 text-red-400 border-red-500/30 pulse-critical'
-	};
 
 	onMount(() => {
 		projects.load();
@@ -187,7 +172,6 @@
 		{:else}
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each state.items as project, i (project.id)}
-					{@const badge = driftBadge(project)}
 					<button
 						type="button"
 						on:click={() => goto(`/dashboard/${project.id}`)}
@@ -204,11 +188,9 @@
 									<span class="text-neutral-700">@</span>{project.repo_branch}
 								</div>
 							</div>
-							<span
-								class="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-xs {badgeClasses[badge.level]}"
-							>
-								{badge.count}
-								<span class="opacity-70">drift{badge.count === 1 ? '' : 's'}</span>
+							<span class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-0.5 font-mono text-xs text-green-400">
+								<span class="h-1.5 w-1.5 rounded-full bg-green-400"></span>
+								monitoring
 							</span>
 						</div>
 
