@@ -160,7 +160,9 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 		log.Info("no change in live state, skipping scan")
 		return
 	}
-	if err := s.rdb.Set(ctx, redisKey, stateHash, 0).Err(); err != nil {
+	// TTL matches the cron interval so a failed scan (e.g. GitHub fetch error)
+	// is retried on the next agent push instead of being skipped permanently.
+	if err := s.rdb.Set(ctx, redisKey, stateHash, 2*time.Minute).Err(); err != nil {
 		log.Error("redis set", "key", redisKey, "error", err)
 	}
 
