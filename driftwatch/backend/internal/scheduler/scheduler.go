@@ -151,7 +151,7 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 	sum := sha256.Sum256(liveJSON)
 	stateHash := hex.EncodeToString(sum[:])
 
-	redisKey := fmt.Sprintf("driftwatch:hash:%s", project.ID.String())
+	redisKey := fmt.Sprintf("driftwatch:hash:v2:%s", project.ID.String())
 	prev, err := s.rdb.Get(ctx, redisKey).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		log.Error("redis get", "key", redisKey, "error", err)
