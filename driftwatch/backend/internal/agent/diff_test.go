@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/docker"
+	"github.com/souvik-biswas-dev/driftwatch/internal/docker"
 )
 
 // expectDrift is the projection of DriftEvent that we assert on in tests.

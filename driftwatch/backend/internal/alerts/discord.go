@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/agent"
-	"github.com/YOURUSERNAME/driftwatch/internal/gemini"
+	"github.com/souvik-biswas-dev/driftwatch/internal/agent"
+	"github.com/souvik-biswas-dev/driftwatch/internal/gemini"
 )
 
 const cooldownPeriod = 30 * time.Minute

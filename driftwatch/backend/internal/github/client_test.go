@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/docker"
+	"github.com/souvik-biswas-dev/driftwatch/internal/docker"
 )
 
 const sampleCompose = `services:

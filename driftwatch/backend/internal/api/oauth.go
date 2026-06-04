@@ -16,8 +16,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/crypto"
-	"github.com/YOURUSERNAME/driftwatch/internal/db"
+	"github.com/souvik-biswas-dev/driftwatch/internal/crypto"
+	"github.com/souvik-biswas-dev/driftwatch/internal/db"
 )
 
 // OAuthConfig holds the GitHub OAuth app credentials and the dashboard URL we

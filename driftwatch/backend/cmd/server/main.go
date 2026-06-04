@@ -20,14 +20,14 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/alerts"
-	"github.com/YOURUSERNAME/driftwatch/internal/api"
-	"github.com/YOURUSERNAME/driftwatch/internal/crypto"
-	"github.com/YOURUSERNAME/driftwatch/internal/db"
-	"github.com/YOURUSERNAME/driftwatch/internal/gemini"
-	"github.com/YOURUSERNAME/driftwatch/internal/github"
-	"github.com/YOURUSERNAME/driftwatch/internal/scheduler"
-	"github.com/YOURUSERNAME/driftwatch/migrations"
+	"github.com/souvik-biswas-dev/driftwatch/internal/alerts"
+	"github.com/souvik-biswas-dev/driftwatch/internal/api"
+	"github.com/souvik-biswas-dev/driftwatch/internal/crypto"
+	"github.com/souvik-biswas-dev/driftwatch/internal/db"
+	"github.com/souvik-biswas-dev/driftwatch/internal/gemini"
+	"github.com/souvik-biswas-dev/driftwatch/internal/github"
+	"github.com/souvik-biswas-dev/driftwatch/internal/scheduler"
+	"github.com/souvik-biswas-dev/driftwatch/migrations"
 )
 
 func main() {

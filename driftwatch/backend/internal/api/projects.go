@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/crypto"
-	"github.com/YOURUSERNAME/driftwatch/internal/db"
+	"github.com/souvik-biswas-dev/driftwatch/internal/crypto"
+	"github.com/souvik-biswas-dev/driftwatch/internal/db"
 )
 
 type createProjectRequest struct {

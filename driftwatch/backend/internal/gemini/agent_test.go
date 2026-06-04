@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/agent"
+	"github.com/souvik-biswas-dev/driftwatch/internal/agent"
 )
 
 const validModelJSON = `{

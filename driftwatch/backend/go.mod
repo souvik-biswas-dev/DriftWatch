@@ -1,4 +1,4 @@
-module github.com/YOURUSERNAME/driftwatch
+module github.com/souvik-biswas-dev/driftwatch
 
 go 1.25.0
 

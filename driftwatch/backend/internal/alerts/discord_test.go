@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/agent"
-	"github.com/YOURUSERNAME/driftwatch/internal/gemini"
+	"github.com/souvik-biswas-dev/driftwatch/internal/agent"
+	"github.com/souvik-biswas-dev/driftwatch/internal/gemini"
 )
 
 func TestSendDriftAlert_PostsExpectedEmbed(t *testing.T) {

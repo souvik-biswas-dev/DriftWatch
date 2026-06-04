@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/docker"
+	"github.com/souvik-biswas-dev/driftwatch/internal/docker"
 )
 
 const (

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v3"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/docker"
+	"github.com/souvik-biswas-dev/driftwatch/internal/docker"
 )
 
 type Client struct {
