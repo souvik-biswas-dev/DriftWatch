@@ -28,6 +28,23 @@ func (q *Queries) SetProjectSecrets(ctx context.Context, id uuid.UUID, githubTok
 	return err
 }
 
+const hasOpenDriftEvent = `
+SELECT EXISTS (
+    SELECT 1 FROM drift_events
+    WHERE project_id = $1
+      AND container_name = $2
+      AND drift_type = $3
+      AND resolved_at IS NULL
+)`
+
+// HasOpenDriftEvent returns true if an identical unresolved drift event already
+// exists for this project. Used to prevent duplicate events on each scan cycle.
+func (q *Queries) HasOpenDriftEvent(ctx context.Context, projectID uuid.UUID, containerName, driftType string) (bool, error) {
+	var exists bool
+	err := q.db.QueryRow(ctx, hasOpenDriftEvent, projectID, containerName, driftType).Scan(&exists)
+	return exists, err
+}
+
 const getProjectByAgentKeyHash = "SELECT id, name, repo_owner, repo_name, repo_branch, docker_host, github_token_encrypted, discord_webhook_url, created_at, updated_at, user_id FROM projects WHERE agent_key_hash = $1"
 
 // GetProjectByAgentKeyHash looks up the project an agent is authorized to push
