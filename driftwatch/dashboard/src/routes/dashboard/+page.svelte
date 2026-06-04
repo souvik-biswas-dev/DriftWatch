@@ -32,11 +32,15 @@
 		'http://localhost:8080';
 
 	$: agentRunCommand =
-		`docker run -d --name driftwatch-agent --restart unless-stopped \\\n` +
-		`  -v /var/run/docker.sock:/var/run/docker.sock:ro \\\n` +
-		`  -e DRIFTWATCH_URL="${apiBase}" \\\n` +
-		`  -e DRIFTWATCH_AGENT_KEY="${newAgentKey}" \\\n` +
-		`  driftwatch-agent`;
+		`# Download the agent (one-time)\n` +
+		`curl -fsSL https://github.com/souvik-biswas-dev/DriftWatch/releases/latest/download/driftwatch-agent-linux-amd64 \\\n` +
+		`  -o driftwatch-agent && chmod +x driftwatch-agent\n\n` +
+		`# Run it (keep alive with nohup)\n` +
+		`nohup env \\\n` +
+		`  DRIFTWATCH_URL="${apiBase}" \\\n` +
+		`  DRIFTWATCH_AGENT_KEY="${newAgentKey}" \\\n` +
+		`  SCAN_INTERVAL=30s \\\n` +
+		`  ./driftwatch-agent > driftwatch-agent.log 2>&1 &`;
 
 	function resetForm() {
 		form = {
@@ -375,9 +379,8 @@
 						Copy command
 					</button>
 					<p class="mt-2 font-mono text-xs text-neutral-600">
-						Build the image once with
-						<code class="text-neutral-400">docker build -f cmd/agent/Dockerfile -t driftwatch-agent .</code>
-						from the backend folder. The agent reads local Docker and pushes state here.
+						The agent is a single binary — no Docker, no Go needed. It reads your local
+						Docker socket and pushes state to DriftWatch every 30 seconds.
 					</p>
 				</div>
 			</div>
