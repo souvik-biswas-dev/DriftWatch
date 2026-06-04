@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/db"
+	"github.com/souvik-biswas-dev/driftwatch/internal/db"
 )
 
 type registerRequest struct {

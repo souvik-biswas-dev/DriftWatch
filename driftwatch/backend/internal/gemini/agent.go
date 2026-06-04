@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/agent"
+	"github.com/souvik-biswas-dev/driftwatch/internal/agent"
 )
 
 // defaultModel is on the Gemini free tier. Override with GEMINI_MODEL, e.g.

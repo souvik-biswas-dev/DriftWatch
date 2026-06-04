@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/db"
-	"github.com/YOURUSERNAME/driftwatch/internal/docker"
+	"github.com/souvik-biswas-dev/driftwatch/internal/db"
+	"github.com/souvik-biswas-dev/driftwatch/internal/docker"
 )
 
 // SchedulerAPI is the subset of the scheduler that the HTTP layer drives.

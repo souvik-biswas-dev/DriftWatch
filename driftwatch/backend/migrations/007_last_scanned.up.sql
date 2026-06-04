@@ -1,0 +1,1 @@
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS last_scanned_at TIMESTAMPTZ;

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/docker"
+	"github.com/souvik-biswas-dev/driftwatch/internal/docker"
 )
 
 func main() {

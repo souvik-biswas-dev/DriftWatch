@@ -15,12 +15,12 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/agent"
-	"github.com/YOURUSERNAME/driftwatch/internal/alerts"
-	"github.com/YOURUSERNAME/driftwatch/internal/crypto"
-	"github.com/YOURUSERNAME/driftwatch/internal/db"
-	"github.com/YOURUSERNAME/driftwatch/internal/gemini"
-	"github.com/YOURUSERNAME/driftwatch/internal/github"
+	"github.com/souvik-biswas-dev/driftwatch/internal/agent"
+	"github.com/souvik-biswas-dev/driftwatch/internal/alerts"
+	"github.com/souvik-biswas-dev/driftwatch/internal/crypto"
+	"github.com/souvik-biswas-dev/driftwatch/internal/db"
+	"github.com/souvik-biswas-dev/driftwatch/internal/gemini"
+	"github.com/souvik-biswas-dev/driftwatch/internal/github"
 )
 
 // GeminiClient is the surface the scheduler depends on for AI analysis.
@@ -192,18 +192,14 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 		return
 	}
 
-	drifts := agent.Diff(live, declared)
-	if len(drifts) == 0 {
-		log.Info("no drift detected")
-		return
-	}
-	log.Info("drift detected", "count", len(drifts))
-
 	declaredJSON, err := json.Marshal(declared)
 	if err != nil {
 		log.Error("marshal declared state", "error", err)
 		return
 	}
+
+	// Always create a snapshot so "Last check" reflects every scan, not just
+	// scans that found drift.
 	snapshot, err := s.dbQueries.CreateSnapshot(ctx, db.CreateSnapshotParams{
 		ProjectID:     project.ID,
 		StateHash:     stateHash,
@@ -214,6 +210,13 @@ func (s *Scheduler) runProjectScan(project db.Project) {
 		log.Error("create snapshot", "error", err)
 		return
 	}
+
+	drifts := agent.Diff(live, declared)
+	if len(drifts) == 0 {
+		log.Info("no drift detected")
+		return
+	}
+	log.Info("drift detected", "count", len(drifts))
 
 	type savedDrift struct {
 		id    uuid.UUID

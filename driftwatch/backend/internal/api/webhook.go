@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/YOURUSERNAME/driftwatch/internal/db"
+	"github.com/souvik-biswas-dev/driftwatch/internal/db"
 )
 
 // githubWebhookRequest is the envelope the Cloudflare worker forwards
