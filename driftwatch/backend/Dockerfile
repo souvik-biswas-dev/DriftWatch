@@ -1,42 +1,42 @@
 # syntax=docker/dockerfile:1.6
 #
 # DriftWatch backend — multi-stage build.
-# Final image is alpine + the static binary, ~20MB.
+# Final image is node:22-alpine + dist/ + production deps.
 
-FROM golang:1.25-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /src
 
-# Cache module downloads independently from source changes.
-COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go mod download
+# Cache the dependency install independently from source changes.
+COPY package.json package-lock.json* ./
+RUN npm ci
 
-COPY . .
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
 
-# Static build. CGO off so we can run on a stripped alpine without glibc.
-# -ldflags shrinks the binary by stripping symbol tables and DWARF info.
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux \
-    go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+# Re-resolve node_modules with dev dependencies pruned.
+RUN npm ci --omit=dev
 
 # --- Runtime stage ---
-FROM alpine:3.19
+FROM node:22-alpine
 
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache tzdata wget \
     && addgroup -S driftwatch \
     && adduser -S -G driftwatch driftwatch
 
 WORKDIR /app
-COPY --from=builder /out/server /app/server
+COPY --from=builder /src/node_modules ./node_modules
+COPY --from=builder /src/dist ./dist
+COPY package.json ./
+COPY migrations ./migrations
 
 USER driftwatch:driftwatch
 
+ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:${PORT}/health || exit 1
 
-ENTRYPOINT ["/app/server"]
+CMD ["node", "dist/index.js"]
