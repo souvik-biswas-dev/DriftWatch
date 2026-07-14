@@ -1,0 +1,96 @@
+# DriftWatch — single-VPS deployment.
+#
+#   cp .env.example .env    # fill it in
+#   docker compose up -d --build
+#
+# Caddy terminates TLS on ports 80/443 and proxies to the backend. Postgres and
+# Redis are NOT published to the host — only the backend can reach them, over
+# the compose network.
+
+name: driftwatch
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: driftwatch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: driftwatch
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U driftwatch -d driftwatch']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Light persistence: the only durable thing here is the cached live state,
+    # which an agent re-pushes within a minute anyway.
+    command: ['redis-server', '--save', '300', '10', '--appendonly', 'no']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ../driftwatch/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://driftwatch:${POSTGRES_PASSWORD}@postgres:5432/driftwatch?sslmode=disable
+      REDIS_URL: redis://redis:6379
+
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      BACKEND_URL: ${BACKEND_URL}
+      DASHBOARD_URL: ${DASHBOARD_URL}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
+
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    expose:
+      - '8080'
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      # Caddy reads this to know which hostname to request a certificate for.
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+
+volumes:
+  pgdata:
+  redisdata:
+  caddydata:
+  caddyconfig:

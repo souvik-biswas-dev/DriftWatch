@@ -1,0 +1,19 @@
+# Caddy fetches and renews a Let's Encrypt certificate for API_DOMAIN
+# automatically — as long as the domain's A record points at this VPS and
+# ports 80/443 are open.
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	# The backend sets its own CORS headers (ALLOWED_ORIGIN); don't add more here
+	# or browsers will reject the duplicated Access-Control-Allow-Origin.
+	reverse_proxy backend:8080 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
