@@ -56,13 +56,17 @@ Create a Pages project pointed at this repo:
 
 | Setting | Value |
 |---|---|
-| Build command | `npm install --legacy-peer-deps && npm run build` |
-| Build output directory | `build` |
 | Root directory | `driftwatch/dashboard` |
+| Build command | `npm run build` |
+| Build output directory | `.svelte-kit/cloudflare` |
 | Environment variable | `VITE_API_BASE_URL` = `https://<your API domain>` (no trailing slash) |
 
+The output directory comes from `@sveltejs/adapter-cloudflare`, and the repo's
+`.npmrc` already sets `legacy-peer-deps`, so the install needs no extra flag.
+
 `VITE_API_BASE_URL` is baked in at build time, so changing it needs a redeploy,
-not just a restart.
+not just a restart. Set it for **both** the production and preview environments,
+or preview deploys will call `localhost:8080`.
 
 ---
 
