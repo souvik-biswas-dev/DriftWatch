@@ -1,0 +1,18 @@
+# Override for a VPS that already runs a web server on ports 80/443
+# (nginx, Apache, an existing Caddy — anything serving other sites).
+#
+# Instead of publishing 80/443 itself, DriftWatch exposes the backend on
+# loopback only and lets the host's web server proxy to it. See
+# nginx-driftwatch-api.conf for the vhost, and README.md for the full walkthrough.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml \
+#     up -d --build postgres redis backend
+#
+# Note the explicit service list: it starts everything except caddy.
+
+services:
+  backend:
+    ports:
+      # Bound to 127.0.0.1, so the port is unreachable from the internet —
+      # only the host's reverse proxy can talk to it.
+      - '127.0.0.1:8080:8080'
