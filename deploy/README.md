@@ -22,6 +22,10 @@ docker compose up -d --build
 
 Migrations run automatically on boot — there is no separate migrate step.
 
+> **Already running a web server on this VPS?** If `caddy` fails with
+> `failed to bind host port 0.0.0.0:80/tcp: address already in use`, skip to
+> [Running behind an existing web server](#running-behind-an-existing-web-server).
+
 Check it:
 
 ```sh
@@ -33,11 +37,51 @@ docker compose logs -f backend
 `/status` returning `503` with `"postgres":"down"` or `"redis":"down"` means the
 backend is up but a datastore isn't — check `docker compose ps`.
 
+### Running behind an existing web server
+
+The bundled Caddy wants ports 80 and 443. If the VPS already serves other sites,
+find out what holds the port before changing anything:
+
+```sh
+sudo ss -tlnp '( sport = :80 or sport = :443 )'
+docker ps --format '{{.Names}}\t{{.Ports}}'
+```
+
+If it is a leftover container from an older deployment, remove it and use the
+default setup. If it is nginx/Apache serving sites you need to keep, leave it
+alone and put DriftWatch behind it instead — the backend binds to loopback and
+the host proxy terminates TLS:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml \
+  up -d --build postgres redis backend
+curl http://127.0.0.1:8080/health          # {"status":"ok"}
+```
+
+Then add the vhost and issue a certificate:
+
+```sh
+sudo cp nginx-driftwatch-api.conf /etc/nginx/sites-available/driftwatch-api
+sudo sed -i 's/driftwatch-api.example.com/YOUR-API-DOMAIN/' \
+  /etc/nginx/sites-available/driftwatch-api
+sudo ln -s /etc/nginx/sites-available/driftwatch-api /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d YOUR-API-DOMAIN
+```
+
+`API_DOMAIN` in `.env` is only read by Caddy, so it is unused on this path —
+`BACKEND_URL` is the value that matters. Every later `docker compose` command
+needs both `-f` flags and the explicit service list, otherwise compose will try
+to start Caddy again and hit the same port clash.
+
 ### Updating
 
 ```sh
 cd DriftWatch && git pull
 cd deploy && docker compose up -d --build backend
+# behind an existing web server:
+cd deploy && docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml \
+  up -d --build backend
 ```
 
 ### Backups
