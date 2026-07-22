@@ -58,7 +58,19 @@ docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml \
 curl http://127.0.0.1:8080/health          # {"status":"ok"}
 ```
 
-Then add the vhost and issue a certificate:
+Then point the host's proxy at it.
+
+**If the host runs Caddy** (`ss` shows the process as `caddy`, not a container) —
+copy the block from `Caddyfile.host` into `/etc/caddy/Caddyfile`, replace the
+hostname, and reload. Caddy issues the certificate itself:
+
+```sh
+sudo nano /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+**If the host runs nginx** — install the vhost and let certbot handle TLS:
 
 ```sh
 sudo cp nginx-driftwatch-api.conf /etc/nginx/sites-available/driftwatch-api

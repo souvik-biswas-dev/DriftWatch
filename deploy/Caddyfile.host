@@ -1,0 +1,21 @@
+# Site block for a Caddy already installed on the host (systemd), serving other
+# apps on ports 80/443. Append it to /etc/caddy/Caddyfile and pair it with
+# docker-compose.host-proxy.yml, which publishes the backend on 127.0.0.1:8080.
+#
+#   sudo nano /etc/caddy/Caddyfile        # paste the block, fix the hostname
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Caddy obtains and renews the certificate itself — no certbot needed.
+
+driftwatch-api.example.com {
+	encode zstd gzip
+
+	# No Access-Control-* headers here: the backend emits its own from
+	# ALLOWED_ORIGIN, and a duplicated Access-Control-Allow-Origin makes
+	# browsers reject the response.
+	#
+	# reverse_proxy sets X-Forwarded-Proto/For/Host automatically; the backend
+	# reads X-Forwarded-Proto when BACKEND_URL is not set explicitly.
+	reverse_proxy 127.0.0.1:8080
+}
